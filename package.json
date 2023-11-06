@@ -1,0 +1,23 @@
+{
+  "name": "jsscript",
+  "version": "0.0.0",
+  "description": "Fastest JavaScript Runtime in JavaScript",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "play": "tsc; node ./dist/playground.js",
+    "test262": "test262-harness --hostType engine262 --hostPath ./bin/jsscript",
+    "build": "tsc"
+  },
+  "author": "XGHeaven <xgheaven@gmail.com>",
+  "license": "ISC",
+  "devDependencies": {
+    "test262-harness": "^9.0.0",
+    "typescript": "^4.3.2"
+  },
+  "dependencies": {
+    "@babel/parser": "^7.14.4",
+    "@babel/types": "^7.14.4",
+    "acorn": "^8.3.0"
+  }
+}
