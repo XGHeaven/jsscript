@@ -1,7 +1,7 @@
 import { Context } from "./context";
 import { JSFunctionObject } from "./object";
 import { Scope } from "./scope";
-import { FunctionBytecode, JSValue, undefinedValue } from "./value";
+import { FunctionBytecode, JSValue, JS_UNDEFINED } from "./value";
 
 export interface StackFrame {
   context: Context
@@ -18,7 +18,7 @@ export function createStackFrame(context: Context, fn: JSFunctionObject): StackF
   }
   return {
     context,
-    values: new Array(fn.body.maxValueStackSize + 1).fill(undefinedValue),
+    values: new Array(fn.body.maxValueStackSize + 1).fill(JS_UNDEFINED),
     parentFrame: null,
     scope,
   }

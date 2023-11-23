@@ -2,7 +2,7 @@ import { Context, PointerCount, StackFrame2 } from "./context";
 import { EnvironmentRecord, isEnvironment, LexcialEnvironmentRecord } from "./environment";
 import { CompletionRecord, isCompletion } from "./types/completion";
 import { createReference, isReference, Reference } from "./types/reference";
-import { JSFunctionValue, JSObjectValue, JSValue, JSValueType, undefinedValue } from "./value";
+import { JSFunctionValue, JSObjectValue, JSValue, JSValueType, JS_UNDEFINED } from "./value";
 
 export function getValue(value: Reference | JSValue): JSValue {
   if (!isReference(value)) {
@@ -61,7 +61,7 @@ export function callFunction(context: Context, fn: JSFunctionValue, thisValue: J
     const param = params[i]
     if (param.type === 'Identifier') {
       newEnv.createMutableBinding(param.name, false)
-      newEnv.initializeBinding(param.name, args[i] ?? undefinedValue)
+      newEnv.initializeBinding(param.name, args[i] ?? JS_UNDEFINED)
     }
   }
 
@@ -75,7 +75,7 @@ export function getV(o: JSValue, name: string | number): JSValue {
   if (name in objectValue.value) {
     return objectValue.value[name]
   }
-  return undefinedValue
+  return JS_UNDEFINED
 }
 
 export function toObject(o: JSValue): JSObjectValue {

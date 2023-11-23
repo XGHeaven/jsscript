@@ -1,13 +1,13 @@
 import { Program, Statement, Expression, Node } from "@babel/types";
-import { EnvironmentRecord, GlobalEnvironmentRecord, LexcialEnvironmentRecord } from "./environment";
-import { callInternal, evalInterval, executor } from "./executor";
+import { EnvironmentRecord, GlobalEnvironmentRecord } from "./environment";
+import { callInternal } from "./executor";
 import { StackFrame } from "./frame";
 import { getIdentifierReference } from "./helper";
 import { Runtime } from "./runtime";
-import { Scope } from "./scope";
 import { CompletionRecord } from "./types/completion";
-import { createReference, Reference } from "./types/reference";
-import { getRealValue, JSValue, undefinedValue } from "./value";
+import { Reference } from "./types/reference";
+import { JSValue, JS_UNDEFINED, JS_NULL } from "./value";
+import { initPrototype } from "./object";
 
 export class StackFrame2 {
   private completion: CompletionRecord | null = null
@@ -47,43 +47,30 @@ export class Context {
 
   walkStacks: (Program | Statement | Expression)[] = []
 
-  currentStackFrame!: StackFrame
+  currentStackFrame: StackFrame | null = null
+
+  protos: JSValue[] = []
+
+  fnProto: JSValue = JS_NULL
+
+  objProto: JSValue = JS_NULL
+
+  nativeErrorProtos: JSValue[] = []
 
   pc = 0
 
-  private lastValue: JSValue = undefinedValue
+  private lastValue: JSValue = JS_UNDEFINED
 
-  constructor(public isolate: Runtime) {}
+  constructor(public runtime: Runtime) {
+    initPrototype(this)
+  }
 
   get environment() {
     return this.envs[this.envs.length - 1]
   }
 
-
   run(fn: JSValue) {
-    callInternal(this, fn, undefinedValue, undefinedValue, [])
-  }
-
-  execute(node: any) {
-    // 脚本运行模式
-    this.stacks.push(new StackFrame2(this))
-    this.envs.push(this.global)
-    this.pushPC(new PointerCount(node, 0))
-
-    while(this.pcs.length) {
-      executor(this)
-    }
-
-    console.log(this.valueStacks.length)
-    if (this.valueStacks.length === 1) {
-      return this.valueStacks[0]
-    }
-
-    return undefinedValue;
-  }
-
-  getValue(value: any) {
-    return getRealValue(value)
+    return callInternal(this, fn, JS_UNDEFINED, JS_UNDEFINED, [])
   }
 
   popValue() {

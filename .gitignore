@@ -119,3 +119,5 @@ dist
 
 # playground
 /src/playground.ts
+
+*.patch

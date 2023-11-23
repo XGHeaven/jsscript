@@ -1,224 +1,24 @@
-import { File, Statement, Expression, Program, BinaryExpression, ObjectPattern } from '@babel/types'
 import * as t from '@babel/types'
-import { Context, PointerCount } from './context';
-import { callFunction, getV, getValue, initializeIdentifierBinding } from './helper';
-import { normalCompletion } from './types/completion';
-import { isReference } from './types/reference';
-import { JSValue, createNumberValue, JSValueType, createStringValue, createFunctionValue, undefinedValue, JSFunctionValue, FunctionBytecode, isUseHostValue, createHostValue } from './value';
+import { Context } from './context';
+import { JSValue, JSValueType, JS_UNDEFINED, isUseHostValue, createHostValue, formatValue, JS_EXCEPTION, isValueTruly, valueToString, isExceptionValue } from './value';
 import { Bytecode } from './bytecode';
 import { createStackFrame } from './frame';
-import { JSObjectType } from './object';
+import { JSDefinePropertyValue, JSFunctionObject, JSGetPropertyValue, JSObjectType, JS_PROPERTY_C_W_E, newFunctionObject, newFunctionObjectValue as newFunctionValue, newObject, newObjectValue } from './object';
 import { Scope } from './scope';
-
-export function executor(context: Context): void {
-  const frame = context.getFrame()
-  const pc = context.popPC()
-  const { environment } = context
-  const { node, step } = pc
-  switch (node.type) {
-    case 'File': {
-      return context.pushPC(new PointerCount(node.program, 0))
-    }
-
-    case 'BlockStatement':
-    case 'Program': {
-      for (let i = node.body.length - 1; i >= 0; i--) {
-        context.pushPC(new PointerCount(node.body[i], 0))
-      }
-      return;
-    }
-
-    case 'ExpressionStatement': {
-      switch (step) {
-        case 0: {
-          context.pushPC(new PointerCount(node, 1))
-          context.pushPC(new PointerCount(node.expression, 0))
-          break
-        }
-        case 1: {
-          // 忽略返回值
-          context.updateLastStatementValue(getValue(context.popValue()))
-        }
-      }
-      return;
-    }
-
-    case 'VariableDeclaration': {
-      const { declarations, kind } = node
-      const declaractor = declarations[Math.floor(step / 2)]
-      const subStep = step % 2
-      const {id, init} = declaractor
-      if (subStep === 0) {
-        context.pushPC(new PointerCount(node, step + 1))
-        if (init) {
-          // TODO:函数检查
-          context.pushPC(new PointerCount(init, 0))
-        } else {
-          context.pushValue(undefinedValue)
-
-        }
-      } else {
-        const value = getValue(context.popValue())
-        switch(id.type) {
-          case 'Identifier': {
-            initializeIdentifierBinding(environment, id.name, kind, value)
-            break
-          }
-          case 'ObjectPattern': {
-            const props = id.properties
-            const pairs = destructObjectPattern(id, value)
-            for (const [key, value] of pairs) {
-              initializeIdentifierBinding(environment, key, kind, value)
-            }
-            break
-          }
-          default: {
-            throw new Error('Unsupport binding of ' + id.type)
-          }
-        }
-
-        if (step + 1 >= declarations.length * 2) {
-          return
-        }
-
-        context.pushPC(new PointerCount(node, step + 1))
-      }
-      return;
-    }
-
-    case 'BinaryExpression': {
-      switch (step) {
-        case 0:
-          context.pushPC(pc)
-          context.pushPC(new PointerCount(node.right, 0))
-          context.pushPC(new PointerCount(node.left, 0))
-          pc.step = 1
-          break
-        case 1: {
-          const leftValue = context.popValue()
-          const rightValue = context.popValue()
-          context.pushValue(calcBinaryExpression(context, getValue(leftValue), node.operator, getValue(rightValue)))
-          break
-        }
-      }
-      return
-    }
-
-    case 'ReturnStatement': {
-      const { argument } = node
-      if (step === 0) {
-        context.pushPC(new PointerCount(node, 1))
-        if (argument) {
-          context.pushPC(new PointerCount(argument, 0))
-        } else {
-          context.pushValue(undefinedValue)
-        }
-      } else {
-        context.setCompletionAndExitFrame(normalCompletion(getValue(context.popValue())))
-      }
-      return
-    }
-
-    case 'NumericLiteral': {
-      return context.pushValue(createNumberValue(node.value))
-    }
-
-    case 'StringLiteral': {
-      return context.pushValue(createStringValue(node.value))
-    }
-
-    case 'FunctionExpression': {
-      return context.pushValue(createFunctionValue(environment, node.params, node.body))
-    }
-
-    case 'CallExpression': {
-      const { callee, arguments } = node
-      if (step === -1) {
-        const com = frame.getCompletion()
-        const value = com === null ? undefinedValue : com.value
-        context.pushValue(getValue(value))
-      } else if (step === 0) {
-        context.pushPC(new PointerCount(node, 1))
-        context.pushPC(new PointerCount(callee, 0))
-      } else if (step <= arguments.length) {
-        context.pushPC(new PointerCount(node, step + 1))
-        context.pushPC(new PointerCount(arguments[step - 1], 0))
-      } else {
-        const value = []
-        for (let i = 0; i < arguments.length; i++) {
-          value.unshift(getValue(context.popValue()))
-        }
-
-        const calleeValue = context.popValue()
-        const thisValue = isReference(calleeValue) ? calleeValue.base : undefined
-        const fnValue = isReference(calleeValue) ? getValue(calleeValue) : calleeValue
-
-        context.pushPC(new PointerCount(node, -1))
-        frame.resetCompletion()
-        callFunction(context, fnValue as JSFunctionValue, thisValue as any, value)
-        return;
-      }
-      return;
-    }
-
-    case 'Identifier': {
-      context.pushValue(context.resolveBinding(node.name))
-      return;
-    }
-    case 'VariableDeclarator': {
-      throw new Error('Unreachable')
-    }
-
-    default: {
-      console.log(node)
-      throw new Error(`unknown type ${node.type}`)
-    }
-  }
-}
-
-function calcBinaryExpression(context: Context, left: JSValue, op: BinaryExpression['operator'], right: JSValue): JSValue {
-  switch (op) {
-    case '+': {
-      if (left.type === JSValueType.Number && right.type === JSValueType.Number) {
-        return createNumberValue(left.value + right.value)
-      }
-      throw new Error('unknow left&right' +left.type + right.type)
-    }
-    default: {
-      throw new Error(`unknown operator: ${op}`)
-    }
-  }
-}
-
-function destructObjectPattern(pattern: ObjectPattern, value: JSValue) {
-  const props = pattern.properties
-
-  const pairs: [string, JSValue][] = []
-
-  for (const prop of props) {
-    if (prop.type === 'ObjectProperty') {
-      if (prop.key.type !== 'Identifier') {
-        throw new Error('TypeError: Only support identifier as ObjectPattern key')
-      }
-      if (prop.value.type === 'Identifier') {
-        pairs.push([prop.value.name, getV(value, prop.key.name)])
-      } else {
-        pairs.push(...destructObjectPattern(prop.value, value))
-      }
-    }
-  }
-
-  return pairs
-}
+import { JSThrowReferenceError, JSThrowTypeError } from './error';
 
 export function callInternal(ctx: Context, fnValue: JSValue, thisValue: JSValue, newTarget: JSValue, args: JSValue[]): JSValue {
   // TODO: create args binding
   if (fnValue.type !== JSValueType.Object) {
-    return {type: JSValueType.Exception}
+    return JSThrowTypeError(ctx, 'not a function');
   }
-  const obj = fnValue.value
+  const obj = fnValue.value as JSFunctionObject
   if (obj.type !== JSObjectType.Function) {
-    return { type: JSValueType.Exception }
+    const callFn = ctx.runtime.classes[obj.type].call
+    if (callFn) {
+      return callFn(ctx, fnValue, thisValue, args, 0);
+    }
+    return JSThrowTypeError(ctx, 'not a function');
   }
 
   const frame = createStackFrame(ctx, obj)
@@ -230,8 +30,17 @@ export function callInternal(ctx: Context, fnValue: JSValue, thisValue: JSValue,
   const ops = fbc.codes
   const v = frame.values
   let scope = frame.scope;
+
+  for (let i = 0; i < fbc.scopeNames[0][0].length; i++) {
+    scope.bind(fbc.scopeNames[0][0][i], { })
+  }
+  for (let i = 0; i < fbc.scopeNames[0][1].length; i++) {
+    scope.bind(fbc.scopeNames[0][1][i], { isConst: true })
+  }
+  
   for (;pc < ops.length;) {
     const op = ops[pc++]
+    console.log(Bytecode[op], sp);
     switch(op) {
       case Bytecode.PushConst:
         v[++sp] = createHostValue(ops[pc++] as any)
@@ -248,16 +57,21 @@ export function callInternal(ctx: Context, fnValue: JSValue, thisValue: JSValue,
       }
       case Bytecode.Goto: {
         pc = ops[pc] as number
+        console.log(`\tgoto ${pc}`)
         break
       }
       case Bytecode.Call: {
         const argc = ops[pc++] as number
         const args = v.slice(sp - argc + 1, sp + 1)
-        const value = callInternal(ctx, v[sp - argc], undefinedValue, undefinedValue, args)
+        console.log(`\tfn=${formatValue(v[sp - argc])}`);
+        console.log(`\targc=${argc}`)
+        args.forEach((arg, i) => console.log(`\targ${i}=${formatValue(arg)}`))
+        const value = callInternal(ctx, v[sp - argc], JS_UNDEFINED, JS_UNDEFINED, args)
         v[++sp] = value
         break
       }
       case Bytecode.Return: {
+        ctx.currentStackFrame = frame.parentFrame
         return v[sp]
       }
       case Bytecode.GetVar: {
@@ -265,10 +79,21 @@ export function callInternal(ctx: Context, fnValue: JSValue, thisValue: JSValue,
         const value = scope.get(name);
         if (value) {
           v[++sp] = value;
+          console.log(`\t${name}=${formatValue(value!)}`)
         } else {
-          // TODO
+          JSThrowReferenceError(ctx, `${name} is not defined`)
         }
         break
+      }
+      case Bytecode.GetVarFromArg: {
+        const argi = ops[pc++] as number;
+        if (argi >= args.length) {
+          v[++sp] = JS_UNDEFINED
+        } else {
+          v[++sp] = args[argi]
+        }
+        console.log(`\ti=${argi} v=${formatValue(v[sp])}`)
+        break;
       }
       case Bytecode.PushScope: {
         const scopeId = ops[pc++] as number
@@ -290,11 +115,79 @@ export function callInternal(ctx: Context, fnValue: JSValue, thisValue: JSValue,
       }
       case Bytecode.SetVar: {
         const name = ops[pc++] as string
-        scope.set(name, v[sp--])
+        scope.set(name, v[sp])
+        console.log(`\t${name}=${formatValue(v[sp])}`)
         break
       }
+      case Bytecode.Object: {
+        v[++sp] = newObjectValue(ctx)
+        break;
+      }
+      case Bytecode.DefineField: {
+        const name = ops[pc++] as string
+        const ret = JSDefinePropertyValue(ctx, v[sp-1], name, v[sp--], JS_PROPERTY_C_W_E);
+        if (!ret) {
+          // TODO
+          JSThrowTypeError(ctx, `Cannot define value of ${name}`)
+        }
+        break;
+      }
+      case Bytecode.GetField: {
+        const name = ops[pc++] as string
+        const val = JSGetPropertyValue(ctx, v[sp], name)
+        if (!isExceptionValue(val)) {
+          v[++sp] = val;
+        }
+        break;
+      }
+      case Bytecode.DefineArrayElement: {
+        const value = v[sp--];
+        const name = valueToString(v[sp--]);
+        const ret = JSDefinePropertyValue(ctx, v[sp], name, value, JS_PROPERTY_C_W_E);
+        // TODO: ret
+        break;
+      }
+      case Bytecode.NewFn: {
+        const index = ops[pc++] as number
+        v[++sp] = newFunctionValue(ctx, fbc.children[index], scope)
+        break;
+      }
+      case Bytecode.Drop: {
+        sp--;
+        break;
+      }
+      case Bytecode.IfFalse: {
+        const pos = ops[pc++] as number
+        if (!isValueTruly(v[sp--])) {
+          console.log(`\goto ${pos}`)
+          pc = pos;
+        }
+        break;
+      }
+      case Bytecode.IfTrue: {
+        const pos = ops[pc++] as number
+        if (isValueTruly(v[sp--])) {
+          console.log(`\goto ${pos}`)
+          pc = pos;
+        }
+        break;
+      }
+      // skip
+      case Bytecode.Label: {
+        pc++;
+        break;
+      }
+    }
+
+    if (ctx.runtime.currentException) {
+      while (sp >= 0) {
+        const val = v[sp--];
+      }
+      ctx.currentStackFrame = frame.parentFrame;
+      return JS_EXCEPTION
     }
   }
-  ctx.currentStackFrame = frame.parentFrame!
-  return undefinedValue
+  ctx.currentStackFrame = frame.parentFrame
+  // console.log(v.slice(0, 4))
+  return v[sp+1]
 }

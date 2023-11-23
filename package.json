@@ -7,11 +7,13 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "play": "tsc; node ./dist/playground.js",
     "test262": "test262-harness --hostType engine262 --hostPath ./bin/jsscript",
+    "test262:ci": "test262-harness --hostType engine262 --hostPath ./bin/jsscript -r json",
     "build": "tsc"
   },
   "author": "XGHeaven <xgheaven@gmail.com>",
   "license": "ISC",
   "devDependencies": {
+    "@types/node": "^20.9.4",
     "test262-harness": "^9.0.0",
     "typescript": "^4.3.2"
   },
