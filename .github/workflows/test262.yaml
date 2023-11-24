@@ -47,6 +47,10 @@ jobs:
         run: pnpm run test262:ci "./test262/test/**/*.js" && pnpm run test262:analysis
 
       - name: Upload Badge
-        run: for file in ./.result/badge/*; do gh gist edit ${{ vars.BADGE_GIST_ID }} $file -a "${{ github.ref }}-`basename $file`"; done
+        run: |
+          set -x
+          for file in ./.result/badge/*.json; do
+            gh gist edit ${{ vars.BADGE_GIST_ID }} $file -a "$(basename ${{ github.ref }})-`basename $file`";
+          done
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}

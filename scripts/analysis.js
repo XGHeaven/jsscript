@@ -21,6 +21,8 @@ for (const r of result) {
     }
 }
 
+console.log(successGroup, allGroup)
+
 fs.mkdirSync('./.result/badge/')
 
 function makeBadge(type, all, success) {

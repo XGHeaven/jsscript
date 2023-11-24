@@ -4,6 +4,8 @@ const fs = require('fs')
 
 const cpuSize = os.availableParallelism?.() ?? os.cpus?.()?.length ?? 1
 
+console.log('Runned with cpu', cpuSize)
+
 const args = [
     '--hostType', 'engine262',
     '--hostPath', './bin/jsscript',
@@ -12,6 +14,8 @@ const args = [
     '--reporter-keys', 'result,attrs,file,scenario,relative',
     ...process.argv.slice(2)
 ]
+
+console.log('Running with args', args)
 
 const c = child.spawn('test262-harness', args, {
     encoding: 'utf8',
