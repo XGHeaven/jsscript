@@ -121,3 +121,5 @@ dist
 /src/playground.ts
 
 *.patch
+result.json
+.result/
