@@ -1,0 +1,52 @@
+name: Test262 Pass
+on:
+  workflow_dispatch:
+  # schedule:
+  #   - corn: '0 4 * * *'
+  # push:
+  #   branches:
+  #     - main
+jobs:
+  Test262:
+    runs-on: ubuntu-latest
+    environment: Test262
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Install Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 8
+          run_install: false
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - uses: actions/cache@v3
+        name: Setup pnpm cache
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Run test
+        run: pnpm run test262:ci "./test262/test/**/*.js" && pnpm run test262:analysis
+
+      - name: Upload Badge
+        run: for file in ./.result/badge/*; do gh gist edit ${{ vars.BADGE_GIST_ID }} $file -a "${{ github.ref }}-`basename $file`"; done
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}

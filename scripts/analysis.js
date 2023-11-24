@@ -1,0 +1,51 @@
+const fs = require('fs')
+
+const result = require('../.result/result.json')
+
+const allTests = result.length;
+const successGroup = {}
+const allGroup = {}
+
+for (const r of result) {
+    const { scenario } = r
+    if (!allGroup[scenario]) {
+        allGroup[scenario] = 1
+    } else {
+        allGroup[scenario] ++
+    }
+    if (!successGroup[scenario]) {
+        successGroup[scenario] = 0
+    }
+    if (r.result.pass) {
+        successGroup[scenario]++
+    }
+}
+
+fs.mkdirSync('./.result/badge/')
+
+function makeBadge(type, all, success) {
+    return {
+        'schemaVersion': 1,
+        'label': `Test262(${type})`,
+        'message': `${(success/all).toFixed(2)}%`,
+        'color': 'green'
+    }
+}
+
+function sum(arr) {
+    return arr.reduce((s, i) => s + i, 0)
+}
+
+fs.writeFileSync('./.result/badge/all.json', JSON.stringify(makeBadge(
+    'all',
+    sum(Object.values(allGroup)),
+    sum(Object.values(successGroup))
+)))
+
+for (const scenario of Object.keys(allGroup)) {
+  fs.writeFileSync(`./.result/badge/${scenario}.json`, JSON.stringify(makeBadge(
+    scenario,
+    allGroup[scenario],
+    successGroup[scenario] || 0,
+  )))
+}
