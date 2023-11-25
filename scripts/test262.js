@@ -30,4 +30,4 @@ c.on('close', code => process.exit(code))
 setInterval(() => {
   // every 5s to report progress
   console.log('Running...', `Writen ${writable.bytesWritten} Bytes`)
-}, 5000)
+}, 30000)
