@@ -43,14 +43,25 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
+      - name: Build source
+        run: pnpm run build
+        # TODO: should remove this in the future
+        continue-on-error: true
+
       - name: Run test
         run: pnpm run test262:ci "./test262/test/**/*.js" && pnpm run test262:analysis
+
+      - name: Upload Test262 Result
+        uses: actions/upload-artifact@v2
+        with:
+          name: test262-result
+          path: ./.result
 
       - name: Upload Badge
         run: |
           set -x
           for file in ./.result/badge/*.json; do
-            gh gist edit ${{ vars.BADGE_GIST_ID }} $file -a "$(basename ${{ github.ref }})-`basename $file`";
+            gh gist edit ${{ vars.BADGE_GIST_ID }} "$file" -a "$(basename ${{ github.ref }})-`basename "$file"`";
           done
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
