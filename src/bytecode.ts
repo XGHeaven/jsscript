@@ -2,11 +2,15 @@ export enum Bytecode {
   Start,
   Stop,
   Plus,
+  EqEqEq,
+  Not,
   PlusConst,
   // (constId: number)
   PlusConstId,
   // (constValue: any)
   PushConst,
+  // () [] => [undefined]
+  PushVoid,
   // (constId: number)
   PushConstId,
   // (pc: number)
@@ -32,21 +36,40 @@ export enum Bytecode {
   // (), using stack
   GetVarFromArg,
 
-  // (fieldName: string)
+  // (fieldName: string) (obj v) => (obj)
   DefineField,
   DefineArrayElement,
+  // (fieldName: string) (obj) => (obj v)
   GetField,
+  // (fieldName: string) (obj) => (v)
+  GetFieldReplace,
+  // (fieldName: string) (v obj) => (v)
+  SetField,
+  // () (obj name) => (obj value)
+  GetAarryElement,
+  // () (obj name) => (value)
+  GetArrayElementReplace,
+
 
   PushScope, // [scopeId: number]
   PopScope, // []
 
   Object, // create empty object
 
-  Array, // create empty array
+  // (argc: number) (...args) => (array)
+  ArrayFrom, // create empty array
   ArrayPush,
+
+  // () (v) => (iter)
+  ForInStart,
+  ForOfStart,
+  ForIterNextOrGoto,
 
   // internal
   Label,
+
+  // () (v1 v2) => (v2 v1)
+  Swap,
 }
 
 export type Bytecodes = unknown[]

@@ -1,5 +1,5 @@
 import {parse as _parse, parseExpression as _parseExpression} from '@babel/parser'
-import { BlockStatement, Expression, File, LVal, Node, PROPERTY_TYPES, Statement, VariableDeclarator, assertAnyTypeAnnotation, assertIdentifier } from '@babel/types'
+import { BlockStatement, Expression, LVal, VariableDeclarator } from '@babel/types'
 import * as t from '@babel/types'
 import { Context } from './context'
 import { FunctionBytecode, JSValue, JSValueType } from './value'
@@ -97,21 +97,27 @@ class Parser {
     this.bc.push(Bytecode.PopScope)
   }
 
-  visitFile(file: File) {
+  visitFile(file: t.File) {
     file.program.body.forEach((v, i) => this.visitStatement(v))
   }
 
-  visitStatement(node: Statement) {
+  visitStatement(node: t.Statement) {
+    let hasValue = true
     switch (node.type) {
       case 'BlockStatement': {
+        hasValue = false
         this.pushScope()
         node.body.forEach(stat => this.visitStatement(stat))
         this.popScope()
         break
       }
+      case 'EmptyStatement': {
+        hasValue = false;
+        break;
+      }
       case 'VariableDeclaration': {
         if (node.kind === 'var') {
-          return unsupported()
+          // return unsupported('var')
         }
         node.declarations.forEach(v => this.visitDeclarator(v, node.kind === 'const'))
         break
@@ -142,11 +148,41 @@ class Parser {
         break;
       }
 
+      case 'ForInStatement': {
+        this.visitForInOrOfStatement(node, true)
+        hasValue = false;
+        break;
+      }
+
+      case 'ForOfStatement': {
+        this.visitForInOrOfStatement(node, false)
+        hasValue = false;
+        break;
+      }
+
+      case 'ReturnStatement': {
+        // TODO
+        break;
+      }
+
+      case 'FunctionDeclaration': {
+        break;
+      }
+
+      case 'TryStatement': {
+        break;
+      }
+
+      case 'ThrowStatement': {
+        break;
+      }
+
       default: {
         unsupported(node.type)
       }
     }
-    this.bc.push(Bytecode.Drop)
+
+    hasValue && this.bc.push(Bytecode.Drop)
   }
 
   private visitDeclarator(node: VariableDeclarator, isConst: boolean) {
@@ -191,6 +227,14 @@ class Parser {
             this.bc.push(Bytecode.Plus)
             break;
           }
+          case '===': {
+            this.bc.push(Bytecode.EqEqEq)
+            break;
+          }
+          case '!==': {
+            this.bc.push(Bytecode.EqEqEq, Bytecode.Not)
+            break;
+          }
           default: {
             return unsupported(`operator ${node.operator}`)
           }
@@ -200,8 +244,7 @@ class Parser {
 
       case 'AssignmentExpression': {
         this.visitExpression(node.right)
-        const vname = this.getIdentify(node.left)
-        this.bc.push(Bytecode.SetVar, vname)
+        this.visitLVal(node.left, LVAL_ASSIGNMENT)
         break;
       }
 
@@ -296,7 +339,36 @@ class Parser {
       }
 
       case 'ArrayExpression': {
-        // this.bc.push(Bytecode.Array)
+        node.elements.forEach(expr => {
+          if (expr === null) {
+            this.bc.push(Bytecode.PushVoid)
+          } else if (expr.type === 'SpreadElement') {
+            // TODO
+          } else {
+            this.visitExpression(expr)
+          }
+        })
+        this.bc.push(Bytecode.ArrayFrom, node.elements.length)
+        break;
+      }
+
+      case 'MemberExpression': {
+        this.visitExpression(node.object);
+        if (node.computed) {
+          // TODO: as
+          this.visitExpression(node.property as t.Expression)
+          this.bc.push(Bytecode.GetArrayElementReplace)
+        } else {
+          switch (node.property.type) {
+            case 'Identifier': {
+              this.bc.push(Bytecode.GetFieldReplace, node.property.name)
+              break
+            }
+            default: {
+              return unsupported(`MemberExpression with property ${node.property.type}`)
+            }
+          }
+        }
         break;
       }
     }
@@ -370,7 +442,58 @@ class Parser {
         })
         break;
       }
+
+      case 'MemberExpression': {
+        this.visitExpression(node.object)
+        if (node.computed) {
+          // TODO: as
+          this.visitExpression(node.property as Expression)
+        } else {
+          // TODO: as
+          this.bc.push(Bytecode.SetField, this.getIdentify(node.property as LVal))
+        }
+        break;
+      }
     }
+  }
+
+  private visitForInOrOfStatement(node: t.ForOfStatement | t.ForInStatement, isIn: boolean) {
+    const labelStart = this.newLabel()
+    // const labelBody = this.newLabel()
+    const labelEnd = this.newLabel()
+
+    this.visitExpression(node.right)
+    this.bc.push(isIn ? Bytecode.ForInStart : Bytecode.ForOfStart)
+
+    this.emitLabel(labelStart)
+    this.pushScope()
+    this.emitGoto(Bytecode.ForIterNextOrGoto, labelEnd)
+
+    switch (node.left.type) {
+      case 'VariableDeclaration': {
+        const isConst = node.left.kind === 'const'
+        node.left.declarations.forEach(v => {
+          this.visitLVal(v.id, LVAL_ASSIGNMENT)
+        })
+        break;
+      }
+      default: {
+        this.visitLVal(node.left, LVAL_ASSIGNMENT)
+      }
+    }
+
+    // Drop assignment value
+    this.bc.push(Bytecode.Drop)
+
+    this.visitStatement(node.body)
+
+    this.popScope()
+
+    this.emitGoto(Bytecode.Goto, labelStart)
+
+    this.emitLabel(labelEnd)
+    // drop iter object
+    this.bc.push(Bytecode.Drop)
   }
 
   toFunctionBytecode(): FunctionBytecode {

@@ -1,11 +1,12 @@
 import * as t from '@babel/types'
 import { Context } from './context';
-import { JSValue, JSValueType, JS_UNDEFINED, isUseHostValue, createHostValue, formatValue, JS_EXCEPTION, isValueTruly, valueToString, isExceptionValue } from './value';
+import { JSValue, JSValueType, JS_UNDEFINED, isUseHostValue, createHostValue, formatValue, JS_EXCEPTION, isValueTruly, valueToString, isExceptionValue, JSInstrinsicValue, createBoolValue } from './value';
 import { Bytecode } from './bytecode';
 import { createStackFrame } from './frame';
-import { JSDefinePropertyValue, JSFunctionObject, JSGetPropertyValue, JSObjectType, JS_PROPERTY_C_W_E, newFunctionObject, newFunctionObjectValue as newFunctionValue, newObject, newObjectValue } from './object';
+import { JSDefinePropertyValue, JSFunctionObject, JSGetPropertyValue, JSIteratorObjectNext, JSNewForInIteratorObject, JSObjectType, JSSetPropertyValue, JS_PROPERTY_C_W_E, newArrayValue, newFunctionObject, newFunctionObjectValue as newFunctionValue, newObject, newObjectValue } from './object';
 import { Scope } from './scope';
 import { JSThrowReferenceError, JSThrowTypeError } from './error';
+import { JSAtom } from './atom';
 
 export function callInternal(ctx: Context, fnValue: JSValue, thisValue: JSValue, newTarget: JSValue, args: JSValue[]): JSValue {
   // TODO: create args binding
@@ -39,12 +40,19 @@ export function callInternal(ctx: Context, fnValue: JSValue, thisValue: JSValue,
   }
   
   for (;pc < ops.length;) {
+    if (sp < 0) {
+      throw new Error(`sp is not negative, now is ${sp}`)
+    }
     const op = ops[pc++]
-    console.log(Bytecode[op], sp);
+    console.log((Bytecode as any)[op as any], `(${op}) pc=${pc} sp=${sp}`);
     switch(op) {
       case Bytecode.PushConst:
         v[++sp] = createHostValue(ops[pc++] as any)
         break
+      case Bytecode.PushVoid: {
+        v[++sp] = JS_UNDEFINED
+        break;
+      }
       case Bytecode.Plus: {
         const l = v[sp--]
         const r = v[sp--]
@@ -66,7 +74,17 @@ export function callInternal(ctx: Context, fnValue: JSValue, thisValue: JSValue,
         console.log(`\tfn=${formatValue(v[sp - argc])}`);
         console.log(`\targc=${argc}`)
         args.forEach((arg, i) => console.log(`\targ${i}=${formatValue(arg)}`))
-        const value = callInternal(ctx, v[sp - argc], JS_UNDEFINED, JS_UNDEFINED, args)
+        const fnLike = v[sp - argc];
+        let fnValue: JSValue = fnLike
+        let thisValue: JSValue = JS_UNDEFINED
+        // if (isReferenceValue(fnLike)) {
+        //   fnValue = fnLike.value
+        //   thisValue = fnLike.host
+        // } else {
+        //   fnValue = fnLike
+        //   thisValue = JS_UNDEFINED
+        // }
+        const value = callInternal(ctx, fnValue, thisValue, JS_UNDEFINED, args)
         v[++sp] = value
         break
       }
@@ -126,9 +144,39 @@ export function callInternal(ctx: Context, fnValue: JSValue, thisValue: JSValue,
       case Bytecode.DefineField: {
         const name = ops[pc++] as string
         const ret = JSDefinePropertyValue(ctx, v[sp-1], name, v[sp--], JS_PROPERTY_C_W_E);
-        if (!ret) {
-          // TODO
+        console.log(`\t${ret}`)
+        if (ret) {
           JSThrowTypeError(ctx, `Cannot define value of ${name}`)
+        }
+        break;
+      }
+      case Bytecode.SetField: {
+        const name = ops[pc++] as string
+        const ret = JSSetPropertyValue(ctx, v[sp--], name, v[sp]);
+        break;
+      }
+      case Bytecode.DefineArrayElement: {
+        const value = v[sp--];
+        const name = valueToString(v[sp--]);
+        const ret = JSDefinePropertyValue(ctx, v[sp], name, value, JS_PROPERTY_C_W_E);
+        // TODO: ret
+        break;
+      }
+      case Bytecode.GetAarryElement: {
+        const prop = valueToString(v[sp--]);
+        const obj = v[sp];
+        const val = JSGetPropertyValue(ctx, obj, prop)
+        if (!isExceptionValue(val)) {
+          v[++sp] = val
+        }
+        break;
+      }
+      case Bytecode.GetArrayElementReplace: {
+        const prop = valueToString(v[sp--]);
+        const obj = v[sp];
+        const val = JSGetPropertyValue(ctx, obj, prop)
+        if (!isExceptionValue(val)) {
+          v[++sp] = val
         }
         break;
       }
@@ -140,16 +188,27 @@ export function callInternal(ctx: Context, fnValue: JSValue, thisValue: JSValue,
         }
         break;
       }
-      case Bytecode.DefineArrayElement: {
-        const value = v[sp--];
-        const name = valueToString(v[sp--]);
-        const ret = JSDefinePropertyValue(ctx, v[sp], name, value, JS_PROPERTY_C_W_E);
-        // TODO: ret
+      case Bytecode.GetFieldReplace: {
+        const name = ops[pc++] as JSAtom
+        const val = JSGetPropertyValue(ctx, v[sp], name)
+        if (!isExceptionValue(val)) {
+          v[sp] = val;
+        }
         break;
       }
       case Bytecode.NewFn: {
         const index = ops[pc++] as number
         v[++sp] = newFunctionValue(ctx, fbc.children[index], scope)
+        break;
+      }
+      case Bytecode.ArrayFrom: {
+        const argc = ops[pc++] as number
+        const array = newArrayValue(ctx)
+        for (let i = argc - 1; i >= 0; i--) {
+          JSDefinePropertyValue(ctx, array, argc - 1 - i, v[sp - i], JS_PROPERTY_C_W_E)
+        }
+        sp -= argc
+        v[sp] = array
         break;
       }
       case Bytecode.Drop: {
@@ -176,6 +235,48 @@ export function callInternal(ctx: Context, fnValue: JSValue, thisValue: JSValue,
       case Bytecode.Label: {
         pc++;
         break;
+      }
+      case Bytecode.ForInStart: {
+        const value = JSNewForInIteratorObject(ctx, v[sp])
+        console.log(`\t${formatValue(value)}`)
+        if (!isExceptionValue(value)) {
+          v[sp] = value;
+        }
+        break;
+      }
+      case Bytecode.ForIterNextOrGoto: {
+        const pos = ops[pc++] as number
+        const next = JSIteratorObjectNext(ctx, v[sp])
+        if (!next) {
+          // end, goto
+          pc = pos
+          console.log(`\tgoto=${pos}`)
+        } else {
+          v[++sp] = next
+          console.log(`\t${formatValue(next)}`)
+        }
+        break;
+      }
+      case Bytecode.EqEqEq: {
+        const a = v[sp--];
+        const b = v[sp];
+        if (isUseHostValue(a) && isUseHostValue(b)) {
+          v[sp] = createBoolValue(a.value === b.value)
+        } else {
+          // TODO: slow compare
+          v[sp] = createBoolValue(false)
+        }
+      }
+      case Bytecode.Not: {
+        const value = v[sp];
+        let bool: boolean
+        if (isUseHostValue(value)) {
+          bool = !value.value
+        } else {
+          // TODO: slow compare
+          bool = false
+        }
+        v[sp] = createBoolValue(bool)
       }
     }
 

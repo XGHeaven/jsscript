@@ -8,6 +8,7 @@ export function newHostFunctionValueWithProto(ctx: Context, hostFn: HostFunction
   const obj = newObjectFromProto(ctx, proto, JSObjectType.HostFunction) as JSPlainObject;
   const hostFnObj: JSHostFunctionObject = {
     ...obj,
+    props: {},
     fn: hostFn,
     rt: ctx.runtime
   }
