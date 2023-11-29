@@ -13,8 +13,9 @@ export enum JSValueType {
   Symbol,
   Bool,
   Object,
+
+  // internal usage
   Exception,
-  // Function
 }
 
 export interface JSCoreValue {
@@ -61,8 +62,15 @@ export interface JSNullValue {
   value: null
 }
 
-export type JSValue = JSNumberValue | JSObjectValue | JSSymbolValue | JSStringValue | JSBoolValue | JSUndefinedValue | JSExpectionValue | JSNullValue
-export type JSHostValue = JSNumberValue | JSBoolValue | JSStringValue | JSUndefinedValue
+// export interface JSReferenceValue {
+//   type: JSValueType.Reference,
+//   host: JSInstrinsicValue,
+//   value: JSInstrinsicValue
+// }
+
+export type JSHostValue = JSNumberValue | JSBoolValue | JSStringValue | JSUndefinedValue | JSNullValue
+export type JSInstrinsicValue = JSHostValue | JSObjectValue | JSSymbolValue
+export type JSValue = JSInstrinsicValue | JSExpectionValue
 
 export const JS_UNDEFINED: JSUndefinedValue = {
   type: JSValueType.Undefined,
@@ -101,6 +109,14 @@ export function createBoolValue(value: boolean): JSBoolValue {
   }
 }
 
+// export function createReferenceValue(host: JSInstrinsicValue, value: JSInstrinsicValue): JSReferenceValue {
+//   return {
+//     type: JSValueType.Reference,
+//     host,
+//     value
+//   }
+// }
+
 export function getRealValue(value: JSValue): any {
   if (value.type === JSValueType.Function) {
     return undefined
@@ -136,6 +152,10 @@ export function isNullValue(value: JSValue): value is JSNullValue {
   return value.type === JSValueType.Null
 }
 
+// export function isReferenceValue(value: JSValue): value is JSReferenceValue {
+//   return value.type === JSValueType.Reference
+// }
+
 export function createHostValue(value: number | string | boolean | undefined): JSHostValue {
   if (typeof value === 'number') {
     return createNumberValue(value)
@@ -165,14 +185,16 @@ export function valueToString(value: JSValue): string {
   }
 }
 
-export function formatValue(value: JSValue) {
+export function formatValue(value: JSValue): string {
   switch(value.type) {
     case JSValueType.Bool:
     case JSValueType.Number: return `${value.value}`
     case JSValueType.String: return `"${value.value}"`
-    case JSValueType.Object: return `[object]`
+    case JSValueType.Object: return `[object ${value.type}]`
     case JSValueType.Undefined: return 'undefined'
     case JSValueType.Exception: return `[expection]`
+    case JSValueType.Null: return `null`
+    case JSValueType.Symbol: return `[Symbol]`
   }
 }
 
@@ -188,6 +210,14 @@ export function toHostValue(value: JSValue): unknown {
     case JSValueType.Exception: return null
   }
 }
+
+// export function toInstrinsiccValue(value: JSValue): JSInstrinsicValue {
+//   switch (value.type) {
+//     case JSValueType.Reference: return value.value
+//     case JSValueType.Exception: return JS_UNDEFINED
+//     default: return value
+//   }
+// }
 
 export function typeofValue(value: JSValue, typeDef?: any): typeof typeDef {
   switch(value.type) {
