@@ -1,7 +1,7 @@
 import { Context } from "./context";
 import { JSFunctionObject } from "./object";
 import { Scope } from "./scope";
-import { FunctionBytecode, JSValue, JS_UNDEFINED } from "./value";
+import { JSValue, JS_UNDEFINED } from "./value";
 
 export interface StackFrame {
   context: Context

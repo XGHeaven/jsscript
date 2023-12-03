@@ -1,3 +1,4 @@
+import { JSAtom, JSAtomToString } from "./atom";
 import { Context } from "./context";
 import { JSDefineProperty, JSDefinePropertyValue, JSObjectType, JS_PROPERTY_CONFIGURE, JS_PROPERTY_C_W, JS_PROPERTY_WRITABLE, newObjectFromProto, newObjectProtoValue, newObjectValueFromProto } from "./object";
 import { JSValue, JS_EMPTY_STRING, JS_EXCEPTION, createStringValue } from "./value";
@@ -45,4 +46,8 @@ export  function JSThrowTypeError(ctx: Context, message: string): JSValue {
 
 export function JSThrowReferenceError(ctx: Context, message: string): JSValue {
   return JSThrowError(ctx, NativeErrorType.ReferenceError, message)
+}
+
+export function JSThrowReferenceErrorNotDefine(ctx: Context, prop: JSAtom) {
+  return JSThrowReferenceError(ctx, `'${JSAtomToString(ctx, prop)}' is not defined.`)
 }

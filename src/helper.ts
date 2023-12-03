@@ -1,8 +1,6 @@
-import { Context, PointerCount, StackFrame2 } from "./context";
-import { EnvironmentRecord, isEnvironment, LexcialEnvironmentRecord } from "./environment";
-import { CompletionRecord, isCompletion } from "./types/completion";
+import { EnvironmentRecord, isEnvironment } from "./environment";
 import { createReference, isReference, Reference } from "./types/reference";
-import { JSFunctionValue, JSObjectValue, JSValue, JSValueType, JS_UNDEFINED } from "./value";
+import { JSObjectValue, JSValue, JSValueType, JS_UNDEFINED } from "./value";
 
 export function getValue(value: Reference | JSValue): JSValue {
   if (!isReference(value)) {
@@ -47,35 +45,6 @@ export function getIdentifierReference(env: EnvironmentRecord, name: string): Re
 
   // Unresolved
   return createReference(undefined, name)
-}
-
-export function callFunction(context: Context, fn: JSFunctionValue, thisValue: JSValue | undefined, args: JSValue[]) {
-  const { params, body, env } = fn
-  const newEnv = new LexcialEnvironmentRecord(context, env)
-  if (thisValue !== undefined) {
-    newEnv.createImmutableBinding('this', true)
-    newEnv.initializeBinding('this', thisValue)
-  }
-
-  for (let i = 0; i < params.length; i++) {
-    const param = params[i]
-    if (param.type === 'Identifier') {
-      newEnv.createMutableBinding(param.name, false)
-      newEnv.initializeBinding(param.name, args[i] ?? JS_UNDEFINED)
-    }
-  }
-
-  context.pushEnv(newEnv)
-  context.pushFrame(new StackFrame2(context))
-  context.pushPC(new PointerCount(body, 0))
-}
-
-export function getV(o: JSValue, name: string | number): JSValue {
-  const objectValue = toObject(o)
-  if (name in objectValue.value) {
-    return objectValue.value[name]
-  }
-  return JS_UNDEFINED
 }
 
 export function toObject(o: JSValue): JSObjectValue {

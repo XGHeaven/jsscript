@@ -1,12 +1,14 @@
 import * as t from '@babel/types'
 import { Context } from './context';
-import { JSValue, JSValueType, JS_UNDEFINED, isUseHostValue, createHostValue, formatValue, JS_EXCEPTION, isValueTruly, valueToString, isExceptionValue, JSInstrinsicValue, createBoolValue } from './value';
+import { JSValue, JSValueType, JS_UNDEFINED, isUseHostValue, createHostValue, formatValue, JS_EXCEPTION, isValueTruly, valueToString, isExceptionValue, createBoolValue, createTryContextValue, isTryContextValue } from './value';
 import { Bytecode } from './bytecode';
 import { createStackFrame } from './frame';
-import { JSDefinePropertyValue, JSFunctionObject, JSGetPropertyValue, JSIteratorObjectNext, JSNewForInIteratorObject, JSObjectType, JSSetPropertyValue, JS_PROPERTY_C_W_E, newArrayValue, newFunctionObject, newFunctionObjectValue as newFunctionValue, newObject, newObjectValue } from './object';
+import { JSDefinePropertyValue, JSFunctionObject, JSGetProperty, JSGetPropertyValue, JSIteratorObjectNext, JSNewForInIteratorObject, JSObjectType, JSSetPropertyValue, JS_PROPERTY_C_W_E, newArrayValue, newObjectValue } from './object';
 import { Scope } from './scope';
-import { JSThrowReferenceError, JSThrowTypeError } from './error';
+import { JSThrow, JSThrowTypeError } from './error';
 import { JSAtom } from './atom';
+import { JSNewFunctionObject } from './function';
+import { debug } from './log';
 
 export function callInternal(ctx: Context, fnValue: JSValue, thisValue: JSValue, newTarget: JSValue, args: JSValue[]): JSValue {
   // TODO: create args binding
@@ -44,9 +46,10 @@ export function callInternal(ctx: Context, fnValue: JSValue, thisValue: JSValue,
       throw new Error(`sp is not negative, now is ${sp}`)
     }
     const op = ops[pc++]
-    console.log((Bytecode as any)[op as any], `(${op}) pc=${pc} sp=${sp}`);
+    debug((Bytecode as any)[op as any], `(${op}) pc=${pc} sp=${sp}`);
     switch(op) {
       case Bytecode.PushConst:
+        debug(`\tvalue=${ops[pc]}`)
         v[++sp] = createHostValue(ops[pc++] as any)
         break
       case Bytecode.PushVoid: {
@@ -55,38 +58,47 @@ export function callInternal(ctx: Context, fnValue: JSValue, thisValue: JSValue,
       }
       case Bytecode.Plus: {
         const l = v[sp--]
-        const r = v[sp--]
+        const r = v[sp]
         if (isUseHostValue(l) && isUseHostValue(r)) {
-          v[++sp] = createHostValue((l.value as any) + (r.value as any))
+          v[sp] = createHostValue((l.value as any) + (r.value as any))
         } else {
           // TODO: slow add
+          v[sp] = createHostValue(-1)
         }
         break
       }
+      case Bytecode.Sub: {
+        const a = v[sp--];
+        const b = v[sp];
+        if (isUseHostValue(a) && isUseHostValue(b)) {
+          v[sp] = createHostValue((a.value as number) - (b.value as number))
+        } else {
+          // TODO: slow sub
+          v[sp] = createHostValue(-1)
+        }
+        break;
+      }
       case Bytecode.Goto: {
         pc = ops[pc] as number
-        console.log(`\tgoto ${pc}`)
+        debug(`\tgoto ${pc}`)
         break
       }
-      case Bytecode.Call: {
+      case Bytecode.Call:
+      case Bytecode.CallMethod: {
         const argc = ops[pc++] as number
         const args = v.slice(sp - argc + 1, sp + 1)
-        console.log(`\tfn=${formatValue(v[sp - argc])}`);
-        console.log(`\targc=${argc}`)
-        args.forEach((arg, i) => console.log(`\targ${i}=${formatValue(arg)}`))
-        const fnLike = v[sp - argc];
-        let fnValue: JSValue = fnLike
-        let thisValue: JSValue = JS_UNDEFINED
-        // if (isReferenceValue(fnLike)) {
-        //   fnValue = fnLike.value
-        //   thisValue = fnLike.host
-        // } else {
-        //   fnValue = fnLike
-        //   thisValue = JS_UNDEFINED
-        // }
-        const value = callInternal(ctx, fnValue, thisValue, JS_UNDEFINED, args)
-        v[++sp] = value
-        break
+        debug(`\tfn=${formatValue(v[sp - argc])}`);
+        debug(`\targc=${argc}`)
+        args.forEach((arg, i) => debug(`\targ${i}=${formatValue(arg)}`))
+        sp -= argc;
+        const fnValue = v[sp];
+        const thisValue = op === Bytecode.CallMethod ? v[--sp] : JS_UNDEFINED;
+        const returnValue = callInternal(ctx, fnValue, thisValue, JS_UNDEFINED, args)
+        debug(`\tCallReturn: ${formatValue(returnValue)}`)
+        if (!isExceptionValue(returnValue)) {
+          v[sp] = returnValue
+        }
+        break;
       }
       case Bytecode.Return: {
         ctx.currentStackFrame = frame.parentFrame
@@ -97,9 +109,13 @@ export function callInternal(ctx: Context, fnValue: JSValue, thisValue: JSValue,
         const value = scope.get(name);
         if (value) {
           v[++sp] = value;
-          console.log(`\t${name}=${formatValue(value!)}`)
+          debug(`\t${name}=${formatValue(value!)}`)
         } else {
-          JSThrowReferenceError(ctx, `${name} is not defined`)
+          const globalValue = JSGetProperty(ctx, ctx.globalValue, name, JS_UNDEFINED, true);
+          if (!isExceptionValue(globalValue)) {
+            debug(`\tglobal ${name}=${formatValue(globalValue)}`)
+            v[++sp] = globalValue
+          }
         }
         break
       }
@@ -110,7 +126,7 @@ export function callInternal(ctx: Context, fnValue: JSValue, thisValue: JSValue,
         } else {
           v[++sp] = args[argi]
         }
-        console.log(`\ti=${argi} v=${formatValue(v[sp])}`)
+        debug(`\ti=${argi} v=${formatValue(v[sp])}`)
         break;
       }
       case Bytecode.PushScope: {
@@ -134,7 +150,7 @@ export function callInternal(ctx: Context, fnValue: JSValue, thisValue: JSValue,
       case Bytecode.SetVar: {
         const name = ops[pc++] as string
         scope.set(name, v[sp])
-        console.log(`\t${name}=${formatValue(v[sp])}`)
+        debug(`\t${name}=${formatValue(v[sp])}`)
         break
       }
       case Bytecode.Object: {
@@ -144,7 +160,7 @@ export function callInternal(ctx: Context, fnValue: JSValue, thisValue: JSValue,
       case Bytecode.DefineField: {
         const name = ops[pc++] as string
         const ret = JSDefinePropertyValue(ctx, v[sp-1], name, v[sp--], JS_PROPERTY_C_W_E);
-        console.log(`\t${ret}`)
+        debug(`\t${ret}`)
         if (ret) {
           JSThrowTypeError(ctx, `Cannot define value of ${name}`)
         }
@@ -198,7 +214,7 @@ export function callInternal(ctx: Context, fnValue: JSValue, thisValue: JSValue,
       }
       case Bytecode.NewFn: {
         const index = ops[pc++] as number
-        v[++sp] = newFunctionValue(ctx, fbc.children[index], scope)
+        v[++sp] = JSNewFunctionObject(ctx, fbc.children[index], scope)
         break;
       }
       case Bytecode.ArrayFrom: {
@@ -215,10 +231,16 @@ export function callInternal(ctx: Context, fnValue: JSValue, thisValue: JSValue,
         sp--;
         break;
       }
+      case Bytecode.Dup: {
+        v[sp + 1] = v[sp]
+        sp++
+        break;
+      }
       case Bytecode.IfFalse: {
         const pos = ops[pc++] as number
+        debug(`\tvalue=${formatValue(v[sp])}`)
         if (!isValueTruly(v[sp--])) {
-          console.log(`\goto ${pos}`)
+          debug(`\goto ${pos}`)
           pc = pos;
         }
         break;
@@ -226,7 +248,7 @@ export function callInternal(ctx: Context, fnValue: JSValue, thisValue: JSValue,
       case Bytecode.IfTrue: {
         const pos = ops[pc++] as number
         if (isValueTruly(v[sp--])) {
-          console.log(`\goto ${pos}`)
+          debug(`\goto ${pos}`)
           pc = pos;
         }
         break;
@@ -238,7 +260,7 @@ export function callInternal(ctx: Context, fnValue: JSValue, thisValue: JSValue,
       }
       case Bytecode.ForInStart: {
         const value = JSNewForInIteratorObject(ctx, v[sp])
-        console.log(`\t${formatValue(value)}`)
+        debug(`\t${formatValue(value)}`)
         if (!isExceptionValue(value)) {
           v[sp] = value;
         }
@@ -250,10 +272,10 @@ export function callInternal(ctx: Context, fnValue: JSValue, thisValue: JSValue,
         if (!next) {
           // end, goto
           pc = pos
-          console.log(`\tgoto=${pos}`)
+          debug(`\tgoto=${pos}`)
         } else {
           v[++sp] = next
-          console.log(`\t${formatValue(next)}`)
+          debug(`\t${formatValue(next)}`)
         }
         break;
       }
@@ -266,6 +288,19 @@ export function callInternal(ctx: Context, fnValue: JSValue, thisValue: JSValue,
           // TODO: slow compare
           v[sp] = createBoolValue(false)
         }
+        debug(`\t${formatValue(a)} "===" ${formatValue(b)} = ${formatValue(v[sp])}`)
+        break;
+      }
+      case Bytecode.EqEq: {
+        const a = v[sp--];
+        const b = v[sp];
+        if (isUseHostValue(a) && isUseHostValue(b)) {
+          v[sp] = createBoolValue(a.value == b.value)
+        } else {
+          // TODO: slow compare
+          v[sp] = createBoolValue(false)
+        }
+        break;
       }
       case Bytecode.Not: {
         const value = v[sp];
@@ -277,18 +312,55 @@ export function callInternal(ctx: Context, fnValue: JSValue, thisValue: JSValue,
           bool = false
         }
         v[sp] = createBoolValue(bool)
+        break;
+      }
+      case Bytecode.Neg: {
+        const value = v[sp];
+        if (isUseHostValue(value)) {
+          // TODO: remove !
+          v[sp] = createHostValue(-value.value!)
+        } else {
+          v[sp] = createHostValue(-1)
+        }
+        break;
+      }
+      case Bytecode.Throw: {
+        JSThrow(ctx, v[sp--])
+        break;
+      }
+      case Bytecode.TryContext: {
+        const currentScope = scope
+        const pos = ops[pc++] as number;
+        v[sp++] = createTryContextValue(pos, currentScope)
+        break;
+      }
+      default: {
+        throw new Error(`Unsupport opcode: ${(Bytecode as any)[op as any]} ${op}`)
       }
     }
 
     if (ctx.runtime.currentException) {
+      let resume = false
       while (sp >= 0) {
         const val = v[sp--];
+        if (isTryContextValue(val)) {
+          const { value, scope: targetScope } = val
+          while (scope && scope !== targetScope) scope = scope.parent!
+          pc = value;
+          v[++sp] = ctx.runtime.currentException!
+          ctx.runtime.currentException = null
+          resume = true;
+          break;
+        }
+      }
+      if (resume) {
+        continue;
       }
       ctx.currentStackFrame = frame.parentFrame;
       return JS_EXCEPTION
     }
   }
   ctx.currentStackFrame = frame.parentFrame
-  // console.log(v.slice(0, 4))
+  // debug(v.slice(0, 4))
   return v[sp+1]
 }

@@ -1,51 +1,13 @@
-import { Program, Statement, Expression, Node } from "@babel/types";
-import { EnvironmentRecord, GlobalEnvironmentRecord } from "./environment";
 import { callInternal } from "./executor";
 import { StackFrame } from "./frame";
-import { getIdentifierReference } from "./helper";
 import { Runtime } from "./runtime";
-import { CompletionRecord } from "./types/completion";
-import { Reference } from "./types/reference";
-import { JSValue, JS_UNDEFINED, JS_NULL } from "./value";
-import { initPrototype } from "./object";
-
-export class StackFrame2 {
-  private completion: CompletionRecord | null = null
-  constructor(public context: Context) {
-  }
-
-  setCompletion(com: CompletionRecord) {
-    this.completion = com
-  }
-
-  getCompletion() {
-    return this.completion
-  }
-
-  resetCompletion() {
-    this.completion = null
-  }
-}
-
-export interface ExprStack {
-
-}
-
-export class PointerCount {
-  constructor(public node: Node, public step: number) {}
-}
+import { JSValue, JS_UNDEFINED, JS_NULL, JSObjectValue, JS_NAN } from "./value";
+import { JSDefinePropertyValue, JSObject, JS_PROPERTY_CONFIGURE, JS_PROPERTY_C_W_E, initPrototype, newObjectValue } from "./object";
+import { JSAtom } from "./atom";
 
 export class Context {
-  global = new GlobalEnvironmentRecord(this, null)
-  envs: EnvironmentRecord[] = []
-
-  stacks: StackFrame2[] = []
-
-  pcs: PointerCount[] = []
-
-  valueStacks: (JSValue | Reference)[] = []
-
-  walkStacks: (Program | Statement | Expression)[] = []
+  globalValue: JSValue
+  globalObject: JSObject
 
   currentStackFrame: StackFrame | null = null
 
@@ -57,89 +19,21 @@ export class Context {
 
   nativeErrorProtos: JSValue[] = []
 
-  pc = 0
-
-  private lastValue: JSValue = JS_UNDEFINED
-
   constructor(public runtime: Runtime) {
     initPrototype(this)
-  }
 
-  get environment() {
-    return this.envs[this.envs.length - 1]
+    this.globalValue = newObjectValue(this)
+    this.globalObject = (this.globalValue as JSObjectValue).value
+
+    JSDefinePropertyValue(this, this.globalValue, 'global', this.globalValue, JS_PROPERTY_C_W_E)
+    JSDefinePropertyValue(this, this.globalValue, 'NaN', JS_NAN, JS_PROPERTY_CONFIGURE)
   }
 
   run(fn: JSValue) {
     return callInternal(this, fn, JS_UNDEFINED, JS_UNDEFINED, [])
   }
 
-  popValue() {
-    return this.valueStacks.pop()!
-  }
-
-  pushValue(value: JSValue | Reference) {
-    this.valueStacks.push(value)
-  }
-
-  popPointor() {
-    return this.walkStacks.pop()!
-  }
-
-  pushPointor(node: any) {
-    this.walkStacks.push(node)
-  }
-
-  getFrame() {
-    return this.stacks[this.stacks.length - 1]
-  }
-
-  setCompletionAndExitFrame(com: CompletionRecord) {
-    const frame = this.popFrame()
-    this.getFrame().setCompletion(com)
-    return frame
-  }
-
-  pushFrame(frame: StackFrame2) {
-    this.stacks.push(frame)
-  }
-
-  popFrame() {
-    return this.stacks.pop()
-  }
-
-  popPC() {
-    return this.pcs.pop()!
-  }
-
-  pushPC(pc: PointerCount): void {
-    this.pcs.push(pc)
-  }
-
-  createFunctionValue() {
-
-  }
-
-  pushEnv(env: EnvironmentRecord) {
-    this.envs.push(env)
-  }
-
-  popEnv(): EnvironmentRecord {
-    return this.envs.pop()!
-  }
-
-  resolveBinding(name: string, env?: EnvironmentRecord): Reference {
-    if (!env) {
-      env = this.environment
-    }
-
-    return getIdentifierReference(env, name)
-  }
-
-  updateLastStatementValue(value: JSValue) {
-    this.lastValue = value
-  }
-
-  getLastStatementValue() {
-    return this.lastValue
+  defineGlobalValue(name: JSAtom, value: JSValue) {
+    JSDefinePropertyValue(this, this.globalValue, name, value, JS_PROPERTY_C_W_E)
   }
 }
