@@ -1,9 +1,22 @@
 export enum Bytecode {
   Start,
   Stop,
+  
+  // Binary
   Plus,
+  // () [a b] => [c]
+  Sub,
   EqEqEq,
-  Not,
+  EqEq,
+  
+  // Unary
+  // () [v] => [bool]
+  Not, // !
+  // () [v] => [v]
+  Neg, // -
+  // () [v] => [bool]
+  TypeOf,
+
   PlusConst,
   // (constId: number)
   PlusConstId,
@@ -15,18 +28,25 @@ export enum Bytecode {
   PushConstId,
   // (pc: number)
   Goto,
-  // (pc: number)
+  // (pc: number) (v) => ()
   IfTrue,
-  // (pc: numebr)
+  // (pc: numebr) (v) => ()
   IfFalse,
-  // (argc: number)
+  // (argc: number) (fnObject ...args) => (ret)
   Call,
-  // (argc: number)
+  // (argc: number) (thisObject fnObject ...args) => (ret)
   CallMethod,
   Apply,
   Return,
   // Drop value
   Drop,
+  // () [v] => [v v]
+  Dup,
+
+  // () [error] => []
+  Throw,
+  // (pos) [] => [throwContext]
+  TryContext,
   
   NewFn,
 

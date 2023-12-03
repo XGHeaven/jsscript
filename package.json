@@ -6,7 +6,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "play": "tsc; node ./dist/playground.js",
-    "test262": "test262-harness --hostType engine262 --hostPath ./bin/jsscript",
+    "test262": "test262-harness --hostType engine262 --hostPath ./bin/jsscript --host-args=\"--test262\" --saveOnlyFailed",
     "test262:ci": "node ./scripts/test262.js",
     "test262:analysis": "node ./scripts/analysis.js",
     "build": "tsc"

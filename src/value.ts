@@ -16,6 +16,7 @@ export enum JSValueType {
 
   // internal usage
   Exception,
+  TryContext,
 }
 
 export interface JSCoreValue {
@@ -62,6 +63,12 @@ export interface JSNullValue {
   value: null
 }
 
+export interface JSTryContextValue {
+  type: JSValueType.TryContext,
+  value: number
+  scope: Scope
+}
+
 // export interface JSReferenceValue {
 //   type: JSValueType.Reference,
 //   host: JSInstrinsicValue,
@@ -70,7 +77,7 @@ export interface JSNullValue {
 
 export type JSHostValue = JSNumberValue | JSBoolValue | JSStringValue | JSUndefinedValue | JSNullValue
 export type JSInstrinsicValue = JSHostValue | JSObjectValue | JSSymbolValue
-export type JSValue = JSInstrinsicValue | JSExpectionValue
+export type JSValue = JSInstrinsicValue | JSExpectionValue | JSTryContextValue
 
 export const JS_UNDEFINED: JSUndefinedValue = {
   type: JSValueType.Undefined,
@@ -84,6 +91,11 @@ export const JS_EXCEPTION : JSExpectionValue = {
 export const JS_NULL: JSNullValue = {
   type: JSValueType.Null,
   value: null
+}
+
+export const JS_NAN: JSNumberValue = {
+  type: JSValueType.Number,
+  value: NaN
 }
 
 export const JS_EMPTY_STRING = createStringValue('')
@@ -109,19 +121,12 @@ export function createBoolValue(value: boolean): JSBoolValue {
   }
 }
 
-// export function createReferenceValue(host: JSInstrinsicValue, value: JSInstrinsicValue): JSReferenceValue {
-//   return {
-//     type: JSValueType.Reference,
-//     host,
-//     value
-//   }
-// }
-
-export function getRealValue(value: JSValue): any {
-  if (value.type === JSValueType.Function) {
-    return undefined
+export function createTryContextValue(pos: number, scope: Scope): JSTryContextValue {
+  return {
+    type: JSValueType.TryContext,
+    value: pos,
+    scope
   }
-  return value.value
 }
 
 export interface FunctionBytecode {
@@ -152,11 +157,21 @@ export function isNullValue(value: JSValue): value is JSNullValue {
   return value.type === JSValueType.Null
 }
 
+export function isTryContextValue(value: JSValue): value is JSTryContextValue {
+  return value.type === JSValueType.TryContext
+}
+
 // export function isReferenceValue(value: JSValue): value is JSReferenceValue {
 //   return value.type === JSValueType.Reference
 // }
 
-export function createHostValue(value: number | string | boolean | undefined): JSHostValue {
+export function createHostValue(value: number | string | boolean | undefined | null): JSHostValue {
+  if (value === null) {
+    return JS_NULL
+  }
+  if (value === undefined) {
+    return JS_UNDEFINED
+  }
   if (typeof value === 'number') {
     return createNumberValue(value)
   }
@@ -166,9 +181,9 @@ export function createHostValue(value: number | string | boolean | undefined): J
   if (typeof value === 'boolean') {
     return createBoolValue(value)
   }
-  if (typeof value === 'undefined') {
-    return JS_UNDEFINED
-  }
+
+  // unreachable: just for type check
+  return JS_UNDEFINED
 }
 
 export function valueToString(value: JSValue): string {
@@ -195,17 +210,18 @@ export function formatValue(value: JSValue): string {
     case JSValueType.Exception: return `[expection]`
     case JSValueType.Null: return `null`
     case JSValueType.Symbol: return `[Symbol]`
+    case JSValueType.TryContext: return `[trycontext]`
   }
 }
 
-export function toHostValue(value: JSValue): unknown {
+export function toHostValue(value: JSValue, transferedSets: WeakSet<object> = new Set()): unknown {
   switch (value.type) {
     case JSValueType.Bool:
     case JSValueType.Number:
     case JSValueType.String:
     case JSValueType.Undefined: return value.value
     case JSValueType.Null: return null
-    case JSValueType.Object: return toHostObject(value.value)
+    case JSValueType.Object: return toHostObject(value.value, transferedSets)
 
     case JSValueType.Exception: return null
   }

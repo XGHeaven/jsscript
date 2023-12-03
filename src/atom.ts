@@ -1,5 +1,4 @@
 import { Context } from "./context"
-import { JSToString } from "./conversion"
 import { JSValue, JSValueType } from "./value"
 
 export type JSAtom = string | number | symbol
@@ -18,4 +17,11 @@ export function JSToPropertyKey(ctx: Context, value: JSValue): JSAtomProperty {
     case JSValueType.Object: return ''
     default: { return ''}
   }
+}
+
+export function JSAtomToString(ctx: Context, value: JSAtom): string {
+  if (typeof value === 'symbol') {
+    return `Symbol(${value.description})`
+  }
+  return `${value}`
 }

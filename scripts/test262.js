@@ -9,6 +9,7 @@ console.log('Runned with cpu', cpuSize)
 const args = [
   '--hostType', 'engine262',
   '--hostPath', './bin/jsscript',
+  '--hostArgs="--test262"',
   '-t', `${cpuSize}`,
   '-r', 'json',
   '--reporter-keys', 'result,attrs,file,scenario,relative',

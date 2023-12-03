@@ -1,7 +1,7 @@
 import { Context } from "./context"
-import { JSObjectType } from "./object"
+import { JSHostFunctionObject, JSObjectType } from "./object"
 import { Runtime } from "./runtime"
-import { JSValue } from "./value"
+import { JSObjectValue, JSValue } from "./value"
 
 export interface JSClassExoticMethods {
   // TODO: return JSDescriptor
@@ -19,13 +19,20 @@ export interface JSClassDefine {
   call: JSClassCall | null
 }
 
+const hostFunctionCallHandler: JSClassCall = (ctx, fnObj, thisObj, args) => {
+  const obj = (fnObj as JSObjectValue).value as JSHostFunctionObject
+  const hostFn = obj.fn
+  const returnValue = hostFn(ctx, thisObj, args)
+  return returnValue
+}
+
 function X(type: number, name: string, exotic: JSClassExoticMethods | null, call: JSClassCall | null): JSClassDefine {
   return {type, name, exotic, call}
 }
 
 const configs = [
   X(JSObjectType.Object, 'Object', null, null),
-  X(JSObjectType.HostFunction, 'Function', null, null),
+  X(JSObjectType.HostFunction, 'Function', null, hostFunctionCallHandler),
   X(JSObjectType.Function, 'Function', null, null),
   X(JSObjectType.Array, 'Array', null, null)
 ]
