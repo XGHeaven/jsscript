@@ -1,7 +1,8 @@
 import { Context } from "./context"
-import { JSHostFunctionObject, JSObjectType } from "./object"
+import { JSThrowTypeError } from "./error"
+import { getObjectData as getObjectData, JSHostFunctionObject, JSObjectType } from "./object"
 import { Runtime } from "./runtime"
-import { JSObjectValue, JSValue } from "./value"
+import { JSObjectValue, JSValue, JS_UNDEFINED } from "./value"
 
 export interface JSClassExoticMethods {
   // TODO: return JSDescriptor
@@ -10,7 +11,7 @@ export interface JSClassExoticMethods {
   // TODO: others
 }
 
-export type JSClassCall = (ctx: Context, fnObj: JSValue, thisObj: JSValue, args: JSValue[], flags: number) => JSValue
+export type JSClassCall = (ctx: Context, fnObj: JSValue, thisObj: JSValue, args: JSValue[], isNew: boolean) => JSValue
 
 export interface JSClassDefine {
   type: number
@@ -19,10 +20,27 @@ export interface JSClassDefine {
   call: JSClassCall | null
 }
 
-const hostFunctionCallHandler: JSClassCall = (ctx, fnObj, thisObj, args) => {
+const hostFunctionCallHandler: JSClassCall = (ctx, fnObj, thisObj, args, isNew) => {
   const obj = (fnObj as JSObjectValue).value as JSHostFunctionObject
-  const hostFn = obj.fn
-  const returnValue = hostFn(ctx, thisObj, args)
+  const data = getObjectData(obj)
+  const hostFn = data.fn
+
+  let thisOrTarget: JSValue
+  if (isNew) {
+    if (data.ctr) {
+      thisOrTarget = fnObj
+    } else {
+      thisOrTarget = JS_UNDEFINED
+    }
+  } else {
+    if (data.ctr) {
+      return JSThrowTypeError(ctx, 'Class constructor cannot be invoked without "new"');
+    } else {
+      thisOrTarget = thisObj
+    }
+  }
+
+  const returnValue = hostFn(ctx, thisOrTarget, args)
   return returnValue
 }
 

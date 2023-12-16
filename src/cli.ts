@@ -3,6 +3,7 @@ import { parseScript } from "./parser"
 import * as fs from 'fs'
 import { isExceptionValue, toHostValue } from "./value"
 import { initTest262 } from "./test262"
+import { enableLog } from "./log"
 
 let file = process.argv[2]
 

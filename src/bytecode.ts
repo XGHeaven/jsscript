@@ -6,16 +6,30 @@ export enum Bytecode {
   Plus,
   // () [a b] => [c]
   Sub,
+  // () [a b] => [c]
+  Div,
   EqEqEq,
   EqEq,
+  Lt,
+  Gt,
+  Le,
+  Ge,
   
   // Unary
   // () [v] => [bool]
   Not, // !
   // () [v] => [v]
   Neg, // -
-  // () [v] => [bool]
+  // () [v] => [number]
+  ToNumber, // +
+  // () [v] => [string]
   TypeOf,
+
+  // Logical
+  // () [a b] => [v]
+  AndAnd,
+  // () [a b] => [v]
+  OrOr,
 
   PlusConst,
   // (constId: number)
@@ -26,6 +40,8 @@ export enum Bytecode {
   PushVoid,
   // (constId: number)
   PushConstId,
+  // () [] => [this]
+  PushThis,
   // (pc: number)
   Goto,
   // (pc: number) (v) => ()
@@ -70,6 +86,8 @@ export enum Bytecode {
   // () (obj name) => (value)
   GetArrayElementReplace,
 
+  // () [obj name] => [bool]
+  Delete,
 
   PushScope, // [scopeId: number]
   PopScope, // []
@@ -90,6 +108,9 @@ export enum Bytecode {
 
   // () (v1 v2) => (v2 v1)
   Swap,
+
+  // (msg: string) [] => []
+  Warning,
 }
 
 export type Bytecodes = unknown[]

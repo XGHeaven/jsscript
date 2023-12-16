@@ -1,27 +1,27 @@
-import * as t from '@babel/types'
 import { Context } from './context';
-import { JSValue, JSValueType, JS_UNDEFINED, isUseHostValue, createHostValue, formatValue, JS_EXCEPTION, isValueTruly, valueToString, isExceptionValue, createBoolValue, createTryContextValue, isTryContextValue } from './value';
+import { JSValue, JSValueType, JS_UNDEFINED, isUseHostValue, createHostValue, formatValue, JS_EXCEPTION, isValueTruly, valueToString, isExceptionValue, createBoolValue, createTryContextValue, isTryContextValue, JSTypeOf, typeofValue } from './value';
 import { Bytecode } from './bytecode';
 import { createStackFrame } from './frame';
-import { JSDefinePropertyValue, JSFunctionObject, JSGetProperty, JSGetPropertyValue, JSIteratorObjectNext, JSNewForInIteratorObject, JSObjectType, JSSetPropertyValue, JS_PROPERTY_C_W_E, newArrayValue, newObjectValue } from './object';
+import { JSDefinePropertyValue, JSFunctionObject, JSGetProperty, JSGetPropertyValue, JSIteratorObjectNext, JSNewForInIteratorObject, JSNewPlainObject, JSObjectType, JSSetPropertyValue, JS_PROPERTY_C_W_E, getObjectData, newArrayValue } from './object';
 import { Scope } from './scope';
 import { JSThrow, JSThrowTypeError } from './error';
 import { JSAtom } from './atom';
 import { JSNewFunctionObject } from './function';
 import { debug } from './log';
+import { JSToNotBoolean, JSToNumber } from './conversion';
 
 export function callInternal(ctx: Context, fnValue: JSValue, thisValue: JSValue, newTarget: JSValue, args: JSValue[]): JSValue {
   // TODO: create args binding
   if (fnValue.type !== JSValueType.Object) {
-    return JSThrowTypeError(ctx, 'not a function');
+    return JSThrowTypeError(ctx, `${typeofValue(ctx, fnValue)} not a function`);
   }
   const obj = fnValue.value as JSFunctionObject
   if (obj.type !== JSObjectType.Function) {
     const callFn = ctx.runtime.classes[obj.type].call
     if (callFn) {
-      return callFn(ctx, fnValue, thisValue, args, 0);
+      return callFn(ctx, fnValue, thisValue, args, false);
     }
-    return JSThrowTypeError(ctx, 'not a function');
+    return JSThrowTypeError(ctx, `not a function`);
   }
 
   const frame = createStackFrame(ctx, obj)
@@ -29,7 +29,8 @@ export function callInternal(ctx: Context, fnValue: JSValue, thisValue: JSValue,
   ctx.currentStackFrame = frame
   let pc = 0
   let sp = 0
-  const fbc = obj.body
+  const data = getObjectData(obj)
+  const fbc = data.body
   const ops = fbc.codes
   const v = frame.values
   let scope = frame.scope;
@@ -46,7 +47,7 @@ export function callInternal(ctx: Context, fnValue: JSValue, thisValue: JSValue,
       throw new Error(`sp is not negative, now is ${sp}`)
     }
     const op = ops[pc++]
-    debug((Bytecode as any)[op as any], `(${op}) pc=${pc} sp=${sp}`);
+    debug(`${(Bytecode as any)[op as any]}(${op})\t${pc} ${sp}`);
     switch(op) {
       case Bytecode.PushConst:
         debug(`\tvalue=${ops[pc]}`)
@@ -154,7 +155,7 @@ export function callInternal(ctx: Context, fnValue: JSValue, thisValue: JSValue,
         break
       }
       case Bytecode.Object: {
-        v[++sp] = newObjectValue(ctx)
+        v[++sp] = JSNewPlainObject(ctx)
         break;
       }
       case Bytecode.DefineField: {
@@ -240,7 +241,7 @@ export function callInternal(ctx: Context, fnValue: JSValue, thisValue: JSValue,
         const pos = ops[pc++] as number
         debug(`\tvalue=${formatValue(v[sp])}`)
         if (!isValueTruly(v[sp--])) {
-          debug(`\goto ${pos}`)
+          debug(`\tgoto ${pos}`)
           pc = pos;
         }
         break;
@@ -292,8 +293,8 @@ export function callInternal(ctx: Context, fnValue: JSValue, thisValue: JSValue,
         break;
       }
       case Bytecode.EqEq: {
-        const a = v[sp--];
-        const b = v[sp];
+        const b = v[sp--];
+        const a = v[sp]
         if (isUseHostValue(a) && isUseHostValue(b)) {
           v[sp] = createBoolValue(a.value == b.value)
         } else {
@@ -303,15 +304,55 @@ export function callInternal(ctx: Context, fnValue: JSValue, thisValue: JSValue,
         break;
       }
       case Bytecode.Not: {
-        const value = v[sp];
-        let bool: boolean
-        if (isUseHostValue(value)) {
-          bool = !value.value
+        v[sp] = JSToNotBoolean(ctx, v[sp])
+        break;
+      }
+      case Bytecode.Gt: {
+        const b = v[sp--];
+        const a = v[sp]
+        let ret: boolean
+        if (isUseHostValue(a) && isUseHostValue(b)) {
+          ret = (a.value as number) > (b.value as number);
         } else {
-          // TODO: slow compare
-          bool = false
+          ret = false
         }
-        v[sp] = createBoolValue(bool)
+        v[sp] = createBoolValue(ret)
+        break;
+      }
+      case Bytecode.Ge: {
+        const b = v[sp--];
+        const a = v[sp]
+        let ret: boolean
+        if (isUseHostValue(a) && isUseHostValue(b)) {
+          ret = (a.value as number) >= (b.value as number);
+        } else {
+          ret = false
+        }
+        v[sp] = createBoolValue(ret)
+        break;
+      }
+      case Bytecode.Lt: {
+        const b = v[sp--];
+        const a = v[sp]
+        let ret: boolean
+        if (isUseHostValue(a) && isUseHostValue(b)) {
+          ret = (a.value as number) < (b.value as number);
+        } else {
+          ret = false
+        }
+        v[sp] = createBoolValue(ret)
+        break;
+      }
+      case Bytecode.Le: {
+        const b = v[sp--];
+        const a = v[sp]
+        let ret: boolean
+        if (isUseHostValue(a) && isUseHostValue(b)) {
+          ret = (a.value as number) <= (b.value as number);
+        } else {
+          ret = false
+        }
+        v[sp] = createBoolValue(ret)
         break;
       }
       case Bytecode.Neg: {
@@ -324,6 +365,10 @@ export function callInternal(ctx: Context, fnValue: JSValue, thisValue: JSValue,
         }
         break;
       }
+      case Bytecode.ToNumber: {
+        v[sp] = JSToNumber(ctx, v[sp])
+        break;
+      }
       case Bytecode.Throw: {
         JSThrow(ctx, v[sp--])
         break;
@@ -332,6 +377,57 @@ export function callInternal(ctx: Context, fnValue: JSValue, thisValue: JSValue,
         const currentScope = scope
         const pos = ops[pc++] as number;
         v[sp++] = createTryContextValue(pos, currentScope)
+        break;
+      }
+      case Bytecode.Div: {
+        const b = v[sp--];
+        const a = v[sp];
+        let ret: any
+        if (isUseHostValue(a) && isUseHostValue(b)) {
+          ret = (a.value as number) / (b.value as number)
+        } else {
+          // TODO
+          ret = 0
+        }
+        v[sp] = createHostValue(ret)
+        break;
+      }
+      case Bytecode.AndAnd: {
+        const b = v[sp--];
+        const a = v[sp];
+        let ret: any
+        if (isUseHostValue(a) && isUseHostValue(b)) {
+          ret = a.value && b.value
+        } else {
+          // TODO
+          ret = false
+        }
+        v[sp] = createHostValue(ret)
+        break;
+      }
+      case Bytecode.OrOr: {
+        const b = v[sp--];
+        const a = v[sp];
+        let ret: any
+        if (isUseHostValue(a) && isUseHostValue(b)) {
+          ret = a.value || b.value
+        } else {
+          // TODO
+          ret = false
+        }
+        v[sp] = createHostValue(ret)
+        break;
+      }
+      case Bytecode.TypeOf: {
+        v[sp] = JSTypeOf(ctx, v[sp])
+        break;
+      }
+      case Bytecode.PushThis: {
+        v[++sp] = thisValue
+        break;
+      }
+      case Bytecode.Warning: {
+        console.warn(`Warning: ${ops[pc++]}`)
         break;
       }
       default: {
