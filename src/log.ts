@@ -1,4 +1,4 @@
-let isEnableLog = false;
+let isEnableLog = false
 
 export function enableLog(enable: boolean) {
   isEnableLog = enable

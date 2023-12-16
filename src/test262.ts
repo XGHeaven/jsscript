@@ -1,7 +1,7 @@
-import { Context } from "./context";
-import { JSNewHostFunction } from "./function";
-import { JSDefinePropertyValue, JSNewPlainObject, JS_PROPERTY_C_W_E } from "./object";
-import { JS_UNDEFINED } from "./value";
+import { Context } from './context'
+import { JSNewHostFunction } from './function'
+import { JSDefinePropertyValue, JSNewPlainObject, JS_PROPERTY_C_W_E } from './object'
+import { JS_UNDEFINED } from './value'
 
 export function initTest262(ctx: Context) {
   const $262 = JSNewPlainObject(ctx)

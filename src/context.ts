@@ -1,11 +1,18 @@
-import { callInternal } from "./executor";
-import { StackFrame } from "./frame";
-import { Runtime } from "./runtime";
-import { JSValue, JS_UNDEFINED, JS_NULL, JSObjectValue, JS_NAN, JS_INFINITY } from "./value";
-import { JSDefinePropertyValue, JSNewPlainObject, JSObject, JS_PROPERTY_CONFIGURE, JS_PROPERTY_C_W_E, initPrototype } from "./object";
-import { JSAtom } from "./atom";
-import { initMath } from "./builtin/Math";
-import { initNumber } from "./builtin/Number";
+import { callInternal } from './executor'
+import { StackFrame } from './frame'
+import { Runtime } from './runtime'
+import { JSValue, JS_UNDEFINED, JS_NULL, JSObjectValue, JS_NAN, JS_INFINITY } from './value'
+import {
+  JSDefinePropertyValue,
+  JSNewPlainObject,
+  JSObject,
+  JS_PROPERTY_CONFIGURE,
+  JS_PROPERTY_C_W_E,
+  initPrototype,
+} from './object'
+import { JSAtom } from './atom'
+import { initMath } from './builtin/Math'
+import { initNumber } from './builtin/Number'
 
 export class Context {
   globalValue: JSValue

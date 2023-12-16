@@ -1,5 +1,5 @@
-import { EnvironmentRecord } from "../environment";
-import { JSValue } from "../value";
+import { EnvironmentRecord } from '../environment'
+import { JSValue } from '../value'
 
 export interface Reference {
   __type: 'reference'
@@ -15,6 +15,6 @@ export function createReference(base: EnvironmentRecord | JSValue | undefined, n
   return {
     __type: 'reference',
     base,
-    name
+    name,
   }
 }

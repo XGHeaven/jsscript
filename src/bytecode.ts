@@ -1,7 +1,7 @@
 export enum Bytecode {
   Start,
   Stop,
-  
+
   // Binary
   Plus,
   // () [a b] => [c]
@@ -14,7 +14,7 @@ export enum Bytecode {
   Gt,
   Le,
   Ge,
-  
+
   // Unary
   // () [v] => [bool]
   Not, // !
@@ -63,7 +63,7 @@ export enum Bytecode {
   Throw,
   // (pos) [] => [throwContext]
   TryContext,
-  
+
   NewFn,
 
   GetVar,
@@ -116,8 +116,8 @@ export enum Bytecode {
 export type Bytecodes = unknown[]
 
 export interface BytecodeConfig<T extends unknown[] = []> {
-  args: T,
-  size: T['length'],
+  args: T
+  size: T['length']
 }
 
 function OP<Args extends unknown[], O extends Bytecode>(op: O): O & BytecodeConfig<Args> {
@@ -126,7 +126,11 @@ function OP<Args extends unknown[], O extends Bytecode>(op: O): O & BytecodeConf
 
 export const OP_START = OP<[], Bytecode.Start>(Bytecode.Start)
 
-
-export function getOpArg<T extends BytecodeConfig, I extends number>(bc: Bytecodes, pos: number,  op: T, i: I): T['args'][I] {
+export function getOpArg<T extends BytecodeConfig, I extends number>(
+  bc: Bytecodes,
+  pos: number,
+  op: T,
+  i: I
+): T['args'][I] {
   return bc[pos + i] as any
 }

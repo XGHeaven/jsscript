@@ -1,5 +1,5 @@
-import { Context } from "./context"
-import { JSValue, JSValueType } from "./value"
+import { Context } from './context'
+import { JSValue, JSValueType } from './value'
 
 export type JSAtom = string | number | symbol
 
@@ -10,12 +10,18 @@ export function JSToPropertyKey(ctx: Context, value: JSValue): JSAtomProperty {
     case JSValueType.Bool:
     case JSValueType.Undefined:
     case JSValueType.Null:
-    case JSValueType.Number: return `${value.value}`
-    case JSValueType.String: return value.value
-    case JSValueType.Symbol: return value.value
+    case JSValueType.Number:
+      return `${value.value}`
+    case JSValueType.String:
+      return value.value
+    case JSValueType.Symbol:
+      return value.value
     // TODO
-    case JSValueType.Object: return ''
-    default: { return ''}
+    case JSValueType.Object:
+      return ''
+    default: {
+      return ''
+    }
   }
 }
 

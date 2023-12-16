@@ -1,6 +1,6 @@
-import { EnvironmentRecord, isEnvironment } from "./environment";
-import { createReference, isReference, Reference } from "./types/reference";
-import { JSObjectValue, JSValue, JSValueType, JS_UNDEFINED } from "./value";
+import { EnvironmentRecord, isEnvironment } from './environment'
+import { createReference, isReference, Reference } from './types/reference'
+import { JSObjectValue, JSValue, JSValueType } from './value'
 
 export function getValue(value: Reference | JSValue): JSValue {
   if (!isReference(value)) {
@@ -18,7 +18,12 @@ export function getValue(value: Reference | JSValue): JSValue {
   throw new Error('Unsupport property')
 }
 
-export function initializeIdentifierBinding(env: EnvironmentRecord, name: string, kind: 'const' | 'let' | 'var', value: JSValue) {
+export function initializeIdentifierBinding(
+  env: EnvironmentRecord,
+  name: string,
+  kind: 'const' | 'let' | 'var',
+  value: JSValue
+) {
   if (kind === 'const') {
     // TODO: 这个操作应该提前
     env.createImmutableBinding(name, true)
@@ -36,7 +41,7 @@ export function getIdentifierReference(env: EnvironmentRecord, name: string): Re
     return createReference(env, name)
   }
 
-  while(env.parent) {
+  while (env.parent) {
     env = env.parent
     if (env.hasBinding(name)) {
       return createReference(env, name)

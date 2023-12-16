@@ -1,9 +1,9 @@
-import { Runtime } from "./runtime"
-import { parseScript } from "./parser"
+import { Runtime } from './runtime'
+import { parseScript } from './parser'
 import * as fs from 'fs'
-import { isExceptionValue, toHostValue } from "./value"
-import { initTest262 } from "./test262"
-import { enableLog } from "./log"
+import { isExceptionValue, toHostValue } from './value'
+import { initTest262 } from './test262'
+// import { enableLog } from "./log";
 
 let file = process.argv[2]
 
@@ -24,7 +24,7 @@ if (file) {
   }
 
   const fn = parseScript(context, script)
-  const ret = context.run(fn);
+  const ret = context.run(fn)
   if (isExceptionValue(ret)) {
     throw toHostValue(isolute.currentException!)
   }

@@ -3,8 +3,23 @@ import { JSToNumber } from '../conversion'
 import { JSThrowTypeError } from '../error'
 import { HostFunction, JSNewHostFunctionWithProto } from '../function'
 import { JSNewObjectFromCtor, JSObjectType, JSNewObject, setObjectData, JSNumberObject, getObjectData } from '../object'
-import { JSExpectionValue, JSNumberValue, JSValue, JS_UNDEFINED, createNumberValue, isExceptionValue, isNumberValue, isObjectValue } from '../value'
-import { defHostFunction, PropertyDefinitions, JSApplyPropertyDefinitions, defHostValue, defHostValueImmutable, FilterTypeKeys } from './helper'
+import {
+  JSExpectionValue,
+  JSNumberValue,
+  JSValue,
+  JS_UNDEFINED,
+  createNumberValue,
+  isExceptionValue,
+  isNumberValue,
+  isObjectValue,
+} from '../value'
+import {
+  defHostFunction,
+  PropertyDefinitions,
+  JSApplyPropertyDefinitions,
+  defHostValueImmutable,
+  FilterTypeKeys,
+} from './helper'
 
 function getThisNumberValue(ctx: Context, thisValue: JSValue): JSNumberValue | JSExpectionValue {
   if (isNumberValue(thisValue)) {
@@ -39,7 +54,7 @@ const numberConstructor: HostFunction = (ctx, targetObj, args) => {
   if (targetObj !== JS_UNDEFINED) {
     const obj = JSNewObjectFromCtor(ctx, targetObj, JSObjectType.Number)
     if (!isExceptionValue(obj)) {
-      setObjectData(obj.value as JSNumberObject, value);
+      setObjectData(obj.value as JSNumberObject, value)
     }
     return obj
   }
@@ -82,7 +97,7 @@ function defNumberValue<T extends FilterTypeKeys<NumberConstructor, number>>(nam
 }
 
 const NumberProtoFunctions: PropertyDefinitions = [
-  defHostFunction('valueOf', numberProtoValueOf , 0),
+  defHostFunction('valueOf', numberProtoValueOf, 0),
   defProtoFn('toString'),
   defProtoFn('toLocaleString'),
   defProtoFn('toFixed'),
@@ -102,7 +117,11 @@ const NumberProperties: PropertyDefinitions = [
 ]
 
 export function initNumber(ctx: Context) {
-  const proto = ctx.protos[JSObjectType.Number] = JSNewObject(ctx, ctx.protos[JSObjectType.Object], JSObjectType.Number)
+  const proto = (ctx.protos[JSObjectType.Number] = JSNewObject(
+    ctx,
+    ctx.protos[JSObjectType.Object],
+    JSObjectType.Number
+  ))
   setObjectData(proto.value as JSNumberObject, createNumberValue(0))
 
   JSApplyPropertyDefinitions(ctx, proto, NumberProtoFunctions)
