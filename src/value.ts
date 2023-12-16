@@ -3,7 +3,7 @@ import { Scope } from "./scope"
 import { BlockStatement, FunctionExpression, Identifier, Pattern, RestElement } from '@babel/types'
 import { EnvironmentRecord } from "./environment"
 import { Bytecodes } from "./bytecode"
-import { JSObject, toHostObject } from "./object"
+import { JSObject, JSObjectType, toHostObject } from "./object"
 
 export enum JSValueType {
   Undefined,
@@ -98,6 +98,21 @@ export const JS_NAN: JSNumberValue = {
   value: NaN
 }
 
+export const JS_INFINITY: JSNumberValue = {
+  type: JSValueType.Number,
+  value: Infinity
+}
+
+export const JS_TRUE: JSBoolValue = {
+  type: JSValueType.Bool,
+  value: true
+}
+
+export const JS_FALSE: JSBoolValue = {
+  type: JSValueType.Bool,
+  value: false
+}
+
 export const JS_EMPTY_STRING = createStringValue('')
 
 export function createNumberValue(num: number): JSNumberValue {
@@ -115,10 +130,7 @@ export function createStringValue(str: string): JSStringValue {
 }
 
 export function createBoolValue(value: boolean): JSBoolValue {
-  return {
-    type: JSValueType.Bool,
-    value
-  }
+  return value ? JS_TRUE : JS_FALSE
 }
 
 export function createTryContextValue(pos: number, scope: Scope): JSTryContextValue {
@@ -159,6 +171,10 @@ export function isNullValue(value: JSValue): value is JSNullValue {
 
 export function isTryContextValue(value: JSValue): value is JSTryContextValue {
   return value.type === JSValueType.TryContext
+}
+
+export function isNumberValue(value: JSValue): value is JSNumberValue {
+  return value.type === JSValueType.Number
 }
 
 // export function isReferenceValue(value: JSValue): value is JSReferenceValue {
@@ -235,17 +251,27 @@ export function toHostValue(value: JSValue, transferedSets: WeakSet<object> = ne
 //   }
 // }
 
-export function typeofValue(value: JSValue, typeDef?: any): typeof typeDef {
+function typeofFn(v: any) {
+  return typeof v
+}
+
+type TypeofType = ReturnType<typeof typeofFn>
+
+export function typeofValue(ctx: Context, value: JSValue): TypeofType {
   switch(value.type) {
     case JSValueType.Bool: return 'boolean'
     case JSValueType.Number: return 'number'
     case JSValueType.String: return 'string'
     case JSValueType.Symbol: return 'symbol'
     case JSValueType.Undefined: return 'undefined'
-    case JSValueType.Object: return 'object'
-    default:  {
-      throw new Error('xx')
+    case JSValueType.Null: return 'object'
+    case JSValueType.Object: {
+      if (value.value.type === JSObjectType.Function || ctx.runtime.classes[value.value.type].call) {
+        return 'function'
+      }
+      return 'object'
     }
+    default: return 'object'
   }
 }
 
@@ -258,4 +284,9 @@ export function isValueTruly(value: JSValue): boolean {
   }
 
   return false
+}
+
+export function JSTypeOf(ctx: Context, value: JSValue): JSValue {
+  const type = typeofValue(ctx, value)
+  return createStringValue(type)
 }

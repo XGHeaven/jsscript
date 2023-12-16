@@ -12,5 +12,5 @@ Inspired by [QuickJS](https://github.com/bellard/quickjs).
 - Provide a easy way to learning JavaScript engine. No needs to learn C.
 - Only support `strict mode` and modern JavaScript feature.
     - Such as `let`, `const`, `async`, `await`, `arrow function`, `class`, etc.
-    - Not implement `with`, `eval`, `var`, etc.
+    - Not implement `with`, `eval`, `var`, `label` etc.
 - Please do not using this project for your production without any tested.

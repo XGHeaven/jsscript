@@ -1,7 +1,6 @@
 import { Context } from "./context";
 import { JSThrowTypeError } from "./error";
-import { JSObject } from "./object";
-import { JSExpectionValue, JSObjectValue, JSStringValue, JSValue, JSValueType, JS_UNDEFINED, createStringValue, isObjectValue } from "./value";
+import { JSBoolValue, JSExpectionValue, JSNumberValue, JSObjectValue, JSStringValue, JSValue, JSValueType, JS_NAN, JS_UNDEFINED, createBoolValue, createNumberValue, createStringValue, isObjectValue, isUseHostValue } from "./value";
 
 export function JSToString(ctx: Context, value: JSValue): JSValue {
   switch(value.type) {
@@ -50,3 +49,36 @@ export function JSOridinaryToPrimitive(ctx: Context, value: JSObjectValue, prefe
   return JS_UNDEFINED
 }
 
+
+export function JSToNumber(ctx: Context, value: JSValue): JSNumberValue | JSExpectionValue {
+  switch(value.type) {
+    case JSValueType.Number: return value;
+    case JSValueType.Bool: {
+      if (value.value === true) {
+        return createNumberValue(1)
+      }
+      // fallthrough to 0
+    }
+    case JSValueType.Null: return createNumberValue(0)
+    case JSValueType.Undefined: return JS_NAN
+    case JSValueType.String: return createNumberValue(+value.value)
+  }
+  // TODO: assert is an object
+  const pri = JSToPrimitive(ctx, value, ToPrimitivePreferredType.Number)
+  // TODO: assert is not a object
+  return JSToNumber(ctx, pri)
+}
+
+export function JSToBoolean(ctx: Context, value: JSValue): JSBoolValue {
+  if (isUseHostValue(value)) {
+    return createBoolValue(value.value ? true : false)
+  }
+  return createBoolValue(true)
+}
+
+export function JSToNotBoolean(ctx: Context, value: JSValue): JSBoolValue {
+  if (isUseHostValue(value)) {
+    return createBoolValue(value.value ? false : true)
+  }
+  return createBoolValue(false)
+}
