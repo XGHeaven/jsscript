@@ -1,10 +1,23 @@
-import { JSAtom } from "./atom";
-import { Context } from "./context";
-import { JSThrowReferenceErrorNotDefine, JSThrowTypeError, initNativeErrorProto } from "./error";
-import { HostFunction, JSNewHostFunction, JSNewHostFunctionWithProto } from "./function";
-import { Runtime } from "./runtime";
-import { Scope } from "./scope";
-import { FunctionBytecode, JSNumberValue, JSObjectValue, JSValue, JSValueType, JS_EXCEPTION, JS_NULL, JS_UNDEFINED, createNumberValue, createStringValue, isExceptionValue, isNullValue, isObjectValue, toHostValue } from "./value";
+import { JSAtom } from './atom'
+import { Context } from './context'
+import { JSThrowReferenceErrorNotDefine, JSThrowTypeError, initNativeErrorProto } from './error'
+import { HostFunction, JSNewHostFunctionWithProto } from './function'
+import { Runtime } from './runtime'
+import { Scope } from './scope'
+import {
+  FunctionBytecode,
+  JSNumberValue,
+  JSObjectValue,
+  JSValue,
+  JSValueType,
+  JS_NULL,
+  JS_UNDEFINED,
+  createStringValue,
+  isExceptionValue,
+  isNullValue,
+  isObjectValue,
+  toHostValue,
+} from './value'
 
 export const enum JSObjectType {
   Object,
@@ -46,7 +59,11 @@ type JSObjectDataMap = {
   }
 }
 
-export type JSObjectData<T extends number> = JSObjectDataMap extends {[K in T]: infer V} ? V : undefined
+export type JSObjectData<T extends number> = JSObjectDataMap extends {
+  [K in T]: infer V
+}
+  ? V
+  : undefined
 
 export interface JSObject<T extends number = number> {
   type: T
@@ -55,11 +72,21 @@ export interface JSObject<T extends number = number> {
   data: JSObjectData<T>
 }
 
-export function JSNewObject<T extends number>(ctx: Context, proto: JSValue | null, type: T, data?: JSObjectData<T>): JSObjectValue {
+export function JSNewObject<T extends number>(
+  ctx: Context,
+  proto: JSValue | null,
+  type: T,
+  data?: JSObjectData<T>
+): JSObjectValue {
   return makeObject(newObjectInternal(ctx, getProtoObject(ctx, proto), type, data))
 }
 
-export function newObjectInternal<T extends number>(ctx: Context, proto: JSObject | null, type: T, data?: JSObjectData<T>): JSObject<T> {
+export function newObjectInternal<T extends number>(
+  ctx: Context,
+  proto: JSObject | null,
+  type: T,
+  data?: JSObjectData<T>
+): JSObject<T> {
   return {
     type,
     proto,
@@ -116,14 +143,14 @@ export function newFunctionObject(ctx: Context, body: FunctionBytecode, scope: S
 export function JSNewFunction(ctx: Context, body: FunctionBytecode, scope: Scope): JSObjectValue {
   return {
     type: JSValueType.Object,
-    value: newFunctionObject(ctx, body, scope)
+    value: newFunctionObject(ctx, body, scope),
   }
 }
 
 export function makeObject<T extends number>(obj: JSObject<T>): JSObjectValue {
   return {
     type: JSValueType.Object,
-    value: obj as unknown as JSObject<number>
+    value: obj as unknown as JSObject<number>,
   }
 }
 
@@ -140,14 +167,14 @@ export function newArray(ctx: Context): JSArrayObject {
     type: JSObjectType.Array,
     props: [] as unknown as JSArrayObject['props'],
     proto: getProtoObject(ctx, ctx.protos[JSObjectType.Array]),
-    data: undefined
+    data: undefined,
   }
 }
 
 export function newArrayValue(ctx: Context): JSValue {
   return {
     type: JSValueType.Object,
-    value: newArray(ctx)
+    value: newArray(ctx),
   }
 }
 
@@ -156,15 +183,17 @@ export function JSNewForInIteratorObject(ctx: Context, value: JSValue): JSValue 
   if (!isObjectValue(value)) {
     return JSThrowTypeError(ctx, `value is not a object`)
   }
-  let obj: JSObject | null = value.value;
+  let obj: JSObject | null = value.value
   while (obj) {
     keys.push(...Object.keys(obj.props))
     obj = obj.proto
   }
-  return makeObject(newObjectInternal(ctx, null, JSObjectType.ForInIterator, {
-    keys,
-    pos: -1
-  }))
+  return makeObject(
+    newObjectInternal(ctx, null, JSObjectType.ForInIterator, {
+      keys,
+      pos: -1,
+    })
+  )
 }
 
 export function JSIteratorObjectNext(ctx: Context, value: JSValue): JSValue | null {
@@ -187,16 +216,16 @@ export function JSIteratorObjectNext(ctx: Context, value: JSValue): JSValue | nu
 }
 
 export const JS_PROPERTY_NONE = 0
-export const JS_PROPERTY_WRITABLE = 1 << 0;
-export const JS_PROPERTY_CONFIGURE = 1 << 1;
-export const JS_PROPERTY_ENUMERABLE = 1 << 2;
-export const JS_PROPERTY_GETSET = 1 << 3;
+export const JS_PROPERTY_WRITABLE = 1 << 0
+export const JS_PROPERTY_CONFIGURE = 1 << 1
+export const JS_PROPERTY_ENUMERABLE = 1 << 2
+export const JS_PROPERTY_GETSET = 1 << 3
 
-export const JS_PROPERTY_C_W = JS_PROPERTY_CONFIGURE | JS_PROPERTY_WRITABLE;
-export const JS_PROPERTY_C_W_E = JS_PROPERTY_CONFIGURE | JS_PROPERTY_WRITABLE | JS_PROPERTY_ENUMERABLE;
+export const JS_PROPERTY_C_W = JS_PROPERTY_CONFIGURE | JS_PROPERTY_WRITABLE
+export const JS_PROPERTY_C_W_E = JS_PROPERTY_CONFIGURE | JS_PROPERTY_WRITABLE | JS_PROPERTY_ENUMERABLE
 
 export function propertyFlagsFromDescriptor(desc: PropertyDescriptor) {
-  let flags = JS_PROPERTY_NONE;
+  let flags = JS_PROPERTY_NONE
   if (desc.enumerable) flags ||= JS_PROPERTY_ENUMERABLE
   if (desc.configurable) flags ||= JS_PROPERTY_CONFIGURE
   if (desc.writable) flags ||= JS_PROPERTY_WRITABLE
@@ -223,13 +252,13 @@ export function JSSetPropertyValue(ctx: Context, objValue: JSValue, prop: JSAtom
       } else {
         if (pr.writable) {
           pr.value = value
-          return 0;
+          return 0
         } else {
           JSThrowTypeError(ctx, `${String(prop)} is readonly`)
           return -1
         }
       }
-      break;
+      break
     }
     obj = obj.proto
   }
@@ -237,20 +266,34 @@ export function JSSetPropertyValue(ctx: Context, objValue: JSValue, prop: JSAtom
   return JSCreateProperty(ctx, objValue.value, prop, value, JS_UNDEFINED, JS_UNDEFINED, JS_PROPERTY_C_W_E)
 }
 
-export function JSDefinePropertyValue(ctx: Context, objValue: JSValue, prop: JSAtom, value: JSValue, flags: number): number {
-  return JSDefineProperty(ctx, objValue, prop, value, JS_UNDEFINED, JS_UNDEFINED, flags);
+export function JSDefinePropertyValue(
+  ctx: Context,
+  objValue: JSValue,
+  prop: JSAtom,
+  value: JSValue,
+  flags: number
+): number {
+  return JSDefineProperty(ctx, objValue, prop, value, JS_UNDEFINED, JS_UNDEFINED, flags)
 }
 
-export function JSDefineProperty(ctx: Context, objValue: JSValue, prop: JSAtom, value: JSValue, getter: JSValue, setter: JSValue, flags: number): number {
+export function JSDefineProperty(
+  ctx: Context,
+  objValue: JSValue,
+  prop: JSAtom,
+  value: JSValue,
+  getter: JSValue,
+  setter: JSValue,
+  flags: number
+): number {
   if (objValue.type !== JSValueType.Object) {
     JSThrowTypeError(ctx, `not a object`)
     return -1
   }
 
   const obj = objValue.value
-  
+
   // TODO: convert prop to string
-  switch(obj.type) {
+  switch (obj.type) {
     case JSObjectType.Array: {
       if (prop === 'length') {
         // TODO
@@ -277,7 +320,15 @@ export function JSDefineProperty(ctx: Context, objValue: JSValue, prop: JSAtom, 
   return JSCreateProperty(ctx, obj, prop, value, getter, setter, flags)
 }
 
-export function JSCreateProperty(ctx: Context, obj: JSObject, prop: JSAtom, value: JSValue, getter: JSValue, setter: JSValue, flags: number): number {
+export function JSCreateProperty(
+  ctx: Context,
+  obj: JSObject,
+  prop: JSAtom,
+  value: JSValue,
+  getter: JSValue,
+  setter: JSValue,
+  flags: number
+): number {
   // TODO: check extensible
 
   const p: Property = {
@@ -287,10 +338,10 @@ export function JSCreateProperty(ctx: Context, obj: JSObject, prop: JSAtom, valu
     value,
     getter,
     setter,
-    getset: (flags & JS_PROPERTY_GETSET) === JS_PROPERTY_GETSET
+    getset: (flags & JS_PROPERTY_GETSET) === JS_PROPERTY_GETSET,
   }
 
-  obj.props.set(prop, p);
+  obj.props.set(prop, p)
   return 0
 }
 
@@ -298,14 +349,23 @@ export function JSGetPropertyValue(ctx: Context, obj: JSValue, prop: JSAtom) {
   return JSGetProperty(ctx, obj, prop, obj, false)
 }
 
-export function JSGetProperty(ctx: Context, objValue: JSValue, prop: JSAtom, thisObj: JSValue, throwError: boolean): JSValue {
+export function JSGetProperty(
+  ctx: Context,
+  objValue: JSValue,
+  prop: JSAtom,
+  thisObj: JSValue,
+  throwError: boolean
+): JSValue {
   let o: JSObject
 
   if (!isObjectValue(objValue)) {
     switch (objValue.type) {
-      case JSValueType.Null: return JSThrowTypeError(ctx, `Cannot read property '${String(prop)}' of null`)
-      case JSValueType.Undefined: return JSThrowTypeError(ctx, `Cannot read property '${String(prop)}' of undefeind`)
-      case JSValueType.Exception: return objValue
+      case JSValueType.Null:
+        return JSThrowTypeError(ctx, `Cannot read property '${String(prop)}' of null`)
+      case JSValueType.Undefined:
+        return JSThrowTypeError(ctx, `Cannot read property '${String(prop)}' of undefeind`)
+      case JSValueType.Exception:
+        return objValue
     }
     const proto = JSGetPrototypePrimitive(ctx, objValue)
     if (!proto || !isObjectValue(proto)) {
@@ -317,14 +377,15 @@ export function JSGetProperty(ctx: Context, objValue: JSValue, prop: JSAtom, thi
   }
 
   if (o.type === JSObjectType.Array && typeof prop === 'number') {
-    // TODO
+    // TODO: remove error
+    // @ts-expect-error
     return (o as JSArrayObject).props[prop]
   }
 
   const p = findProperty(ctx, o, prop)
   if (!p) {
     if (throwError) {
-      return JSThrowReferenceErrorNotDefine(ctx, prop);
+      return JSThrowReferenceErrorNotDefine(ctx, prop)
     }
     return JS_UNDEFINED
   }
@@ -373,8 +434,10 @@ export function JSNewObjectFromCtor(ctx: Context, ctor: JSValue, type: number) {
 
 export function JSGetPrototypePrimitive(ctx: Context, value: JSValue) {
   switch (value.type) {
-    case JSValueType.Number: return ctx.protos[JSObjectType.Number]
-    case JSValueType.String: return ctx.protos[JSObjectType.String]
+    case JSValueType.Number:
+      return ctx.protos[JSObjectType.Number]
+    case JSValueType.String:
+      return ctx.protos[JSObjectType.String]
     // TODO: other
     default: {
       return null
@@ -385,7 +448,7 @@ export function JSGetPrototypePrimitive(ctx: Context, value: JSValue) {
 const emptyFn: HostFunction = () => JS_UNDEFINED
 
 export function initPrototype(ctx: Context) {
-  const objProto = ctx.objProto = ctx.protos[JSObjectType.Object] = JSNewObject(ctx, JS_NULL, JSObjectType.Object)
+  const objProto = (ctx.objProto = ctx.protos[JSObjectType.Object] = JSNewObject(ctx, JS_NULL, JSObjectType.Object))
 
   ctx.fnProto = ctx.protos[JSObjectType.Function] = JSNewHostFunctionWithProto(ctx, emptyFn, 'Function', 0, objProto)
 
@@ -401,12 +464,20 @@ export function toHostObject(obj: JSObject, transferedSets: WeakSet<object>) {
   }
   transferedSets.add(obj)
   switch (obj.type) {
-    case JSObjectType.Object: return Object.fromEntries(Object.entries(obj.props).filter(([_, desc]) => desc.enumerable && desc.configure).map(([prop, desc]) => [prop, toHostValue(desc.value, transferedSets)]));
-    case JSObjectType.Error: return new Error(`${toHostValue(obj.props.get('message')!.value, transferedSets) as string}`);
-    case JSObjectType.Array: return (obj.props as unknown as any[]).map(v => v ? toHostValue(v.value, transferedSets) : v)
-    case JSObjectType.Function: return `[object Function]`
+    case JSObjectType.Object:
+      return Object.fromEntries(
+        Object.entries(obj.props)
+          .filter(([_, desc]) => desc.enumerable && desc.configure)
+          .map(([prop, desc]) => [prop, toHostValue(desc.value, transferedSets)])
+      )
+    case JSObjectType.Error:
+      return new Error(`${toHostValue(obj.props.get('message')!.value, transferedSets) as string}`)
+    case JSObjectType.Array:
+      return (obj.props as unknown as any[]).map((v) => (v ? toHostValue(v.value, transferedSets) : v))
+    case JSObjectType.Function:
+      return `[object Function]`
     default: {
-      return {__INTERNAL__: `Unknown object type ${obj.type}`}
+      return { __INTERNAL__: `Unknown object type ${obj.type}` }
     }
   }
 }

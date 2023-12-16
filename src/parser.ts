@@ -1,19 +1,19 @@
 import { parse as _parse, parseExpression as _parseExpression } from '@babel/parser'
-import { BlockStatement, Expression, LVal, VariableDeclarator } from '@babel/types'
+import { BlockStatement, Expression, VariableDeclarator } from '@babel/types'
 import * as t from '@babel/types'
 import { Context } from './context'
 import { FunctionBytecode, JSValue, JSValueType } from './value'
 import { Bytecode, Bytecodes } from './bytecode'
-import { JSFunctionObject, JSObjectType, getProtoObject, newFunctionObject } from './object'
+import { newFunctionObject } from './object'
 import { Scope } from './scope'
 
 function unsupported(message: string = '') {
   throw new Error(`Unsupported: ${message}`)
 }
 
-const LVAL_ASSIGNMENT = 1 << 0;
-const LVAL_DECLARE = 1 << 1;
-const LVAL_DECLARE_CONST = 1 << 2;
+const LVAL_ASSIGNMENT = 1 << 0
+const LVAL_DECLARE = 1 << 1
+const LVAL_DECLARE_CONST = 1 << 2
 
 interface ScopeVarBinding {
   name: string
@@ -43,7 +43,7 @@ interface Breakable {
 class Parser {
   bc: Bytecodes = []
   scopes: ParserScope[] = []
-  scopeIndex = 0;
+  scopeIndex = 0
   children: Parser[] = []
   labels: LabelSlot[] = []
   breakables: Breakable[] = []
@@ -59,13 +59,13 @@ class Parser {
   constructor(public ctx: Context) {
     this.scopes.push({
       vars: [],
-      parent: 0
+      parent: 0,
     })
-    this.scopeIndex = 0;
+    this.scopeIndex = 0
   }
 
   newLabel() {
-    this.labels.push({pos: -1, refs: []})
+    this.labels.push({ pos: -1, refs: [] })
     return this.labels.length - 1
   }
 
@@ -88,9 +88,9 @@ class Parser {
   pushScope() {
     this.scopes.push({
       vars: [],
-      parent: this.scopeIndex
+      parent: this.scopeIndex,
     })
-    this.scopeIndex = this.scopes.length - 1;
+    this.scopeIndex = this.scopes.length - 1
     this.bc.push(Bytecode.PushScope, this.scopeIndex)
   }
 
@@ -112,19 +112,19 @@ class Parser {
       case 'BlockStatement': {
         hasValue = false
         this.pushScope()
-        node.body.forEach(stat => this.visitStatement(stat))
+        node.body.forEach((stat) => this.visitStatement(stat))
         this.popScope()
         break
       }
       case 'EmptyStatement': {
-        hasValue = false;
-        break;
+        hasValue = false
+        break
       }
       case 'VariableDeclaration': {
         if (node.kind === 'var') {
           // return unsupported('var')
         }
-        node.declarations.forEach(v => this.visitDeclarator(v, node.kind === 'const'))
+        node.declarations.forEach((v) => this.visitDeclarator(v, node.kind === 'const'))
         break
       }
 
@@ -150,8 +150,8 @@ class Parser {
       }
 
       case 'ExpressionStatement': {
-        this.visitExpression(node.expression);
-        break;
+        this.visitExpression(node.expression)
+        break
       }
 
       case 'ForStatement': {
@@ -172,7 +172,7 @@ class Parser {
         if (node.init) {
           if (node.init.type === 'VariableDeclaration') {
             const isConst = node.init.kind === 'const'
-            node.init.declarations.forEach(declare => this.visitDeclarator(declare, isConst))
+            node.init.declarations.forEach((declare) => this.visitDeclarator(declare, isConst))
           } else {
             this.visitExpression(node.init)
           }
@@ -202,19 +202,19 @@ class Parser {
 
         this.breakables.pop()
         hasValue = false
-        break;
+        break
       }
 
       case 'ForInStatement': {
         this.visitForInOrOfStatement(node, true)
-        hasValue = false;
-        break;
+        hasValue = false
+        break
       }
 
       case 'ForOfStatement': {
         this.visitForInOrOfStatement(node, false)
-        hasValue = false;
-        break;
+        hasValue = false
+        break
       }
 
       case 'ReturnStatement': {
@@ -224,7 +224,7 @@ class Parser {
           this.bc.push(Bytecode.PushVoid)
         }
         this.bc.push(Bytecode.Return)
-        break;
+        break
       }
 
       case 'FunctionDeclaration': {
@@ -239,17 +239,17 @@ class Parser {
           })
           this.bc.push(Bytecode.SetVar, node.id.name)
         }
-        break;
+        break
       }
 
       case 'TryStatement': {
-        const catchLabel = this.newLabel();
-        const finishLabel = this.newLabel();
+        const catchLabel = this.newLabel()
+        const finishLabel = this.newLabel()
         this.emitGoto(Bytecode.TryContext, catchLabel)
         this.visitStatement(node.block)
         this.bc.push(Bytecode.Drop) // remove context
         this.emitGoto(Bytecode.Goto, finishLabel)
-        
+
         this.emitLabel(catchLabel)
         if (node.handler) {
           this.visitCatch(node.handler)
@@ -260,49 +260,49 @@ class Parser {
           this.visitStatement(node.finalizer)
         }
         hasValue = false
-        break;
+        break
       }
 
       case 'ThrowStatement': {
         this.visitExpression(node.argument)
         this.bc.push(Bytecode.Throw)
-        break;
+        break
       }
 
       case 'BreakStatement': {
-        const top = this.topBreakable;
+        const top = this.topBreakable
         if (!top) {
           throw new Error(`TopBreakable is none`)
         }
         let scopeIndex = this.scopeIndex
         while (scopeIndex !== top.scope) {
           if (scopeIndex === 0) {
-            throw new Error('Cannot pop scope in break/continue');
+            throw new Error('Cannot pop scope in break/continue')
           }
           this.bc.push(Bytecode.PopScope)
           scopeIndex = this.scopes[scopeIndex].parent
         }
         this.emitGoto(Bytecode.Goto, top.breakLabel)
-        hasValue = false;
-        break;
+        hasValue = false
+        break
       }
 
       case 'ContinueStatement': {
-        const top = this.topBreakable;
+        const top = this.topBreakable
         if (!top) {
           throw new Error(`TopBreakable is none`)
         }
         let scopeIndex = this.scopeIndex
         while (scopeIndex !== top.scope) {
           if (scopeIndex === 0) {
-            throw new Error('Cannot pop scope in break/continue');
+            throw new Error('Cannot pop scope in break/continue')
           }
           this.bc.push(Bytecode.PopScope)
           scopeIndex = this.scopes[scopeIndex].parent
         }
         this.emitGoto(Bytecode.Goto, top.continueLabel)
-        hasValue = false;
-        break;
+        hasValue = false
+        break
       }
 
       default: {
@@ -321,11 +321,11 @@ class Parser {
   }
 
   private visitFunctionBody(node: BlockStatement | Expression) {
-    switch(node.type) {
+    switch (node.type) {
       case 'BlockStatement': {
         node.body.forEach((v, i) => this.visitStatement(v))
         this.bc.push(Bytecode.PushVoid, Bytecode.Return)
-        break;
+        break
       }
       default: {
         this.visitExpression(node)
@@ -338,13 +338,13 @@ class Parser {
     switch (node.type) {
       case 'NullLiteral': {
         this.bc.push(Bytecode.PushConst, null)
-        break;
+        break
       }
       case 'BooleanLiteral':
       case 'StringLiteral':
       case 'NumericLiteral': {
         this.bc.push(Bytecode.PushConst, node.value)
-        break;
+        break
       }
 
       case 'UnaryExpression': {
@@ -353,11 +353,11 @@ class Parser {
         switch (operator) {
           case '-': {
             op = Bytecode.Neg
-            break;
+            break
           }
           case '+': {
             op = Bytecode.ToNumber
-            break;
+            break
           }
           case '!': {
             op = Bytecode.Not
@@ -368,7 +368,7 @@ class Parser {
             break
           }
           case 'delete': {
-            op = Bytecode.Delete;
+            op = Bytecode.Delete
             break
           }
           default: {
@@ -384,7 +384,7 @@ class Parser {
             // delete a.b.c;
             if (argument.computed === false) {
               if (argument.property.type === 'Identifier') {
-                this.bc.push(Bytecode.PushConst, argument.property.name);
+                this.bc.push(Bytecode.PushConst, argument.property.name)
               } else {
                 // others is invalid, for now
                 return unsupported(`Delete unknown type node: ${argument.property.type}`)
@@ -393,12 +393,12 @@ class Parser {
           } else {
             // others ignore, always return true
             this.bc.push(Bytecode.Drop, Bytecode.PushConst, true)
-            break;
+            break
           }
         }
 
         this.bc.push(op)
-        break;
+        break
       }
 
       case 'BinaryExpression': {
@@ -410,53 +410,53 @@ class Parser {
         switch (node.operator) {
           case '+': {
             this.bc.push(Bytecode.Plus)
-            break;
+            break
           }
           case '-': {
-            this.bc.push(Bytecode.Sub);
-            break;
+            this.bc.push(Bytecode.Sub)
+            break
           }
           case '===': {
             this.bc.push(Bytecode.EqEqEq)
-            break;
+            break
           }
           case '!==': {
             this.bc.push(Bytecode.EqEqEq, Bytecode.Not)
-            break;
+            break
           }
           case '==': {
             this.bc.push(Bytecode.EqEq)
-            break;
+            break
           }
           case '!=': {
             this.bc.push(Bytecode.EqEq, Bytecode.Not)
-            break;
+            break
           }
           case '>': {
             this.bc.push(Bytecode.Gt)
-            break;
+            break
           }
           case '>=': {
             this.bc.push(Bytecode.Ge)
-            break;
+            break
           }
           case '<': {
             this.bc.push(Bytecode.Lt)
-            break;
+            break
           }
           case '<=': {
             this.bc.push(Bytecode.Le)
-            break;
+            break
           }
           case '/': {
             this.bc.push(Bytecode.Div)
-            break;
+            break
           }
           default: {
             this.warn(`Unimplement operator ${node.operator}`)
           }
         }
-        break;
+        break
       }
 
       case 'LogicalExpression': {
@@ -465,41 +465,43 @@ class Parser {
         switch (node.operator) {
           case '&&': {
             this.bc.push(Bytecode.AndAnd)
-            break;
+            break
           }
           case '||': {
             this.bc.push(Bytecode.OrOr)
-            break;
+            break
           }
-          default: return unsupported(`LogicalExpression: ${node.operator}`)
+          default:
+            return unsupported(`LogicalExpression: ${node.operator}`)
         }
-        break;
+        break
       }
 
       case 'AssignmentExpression': {
         this.visitExpression(node.right)
-        this.visitLVal(node.left, LVAL_ASSIGNMENT)
-        break;
+        // TODO
+        this.visitLVal(node.left as t.LVal, LVAL_ASSIGNMENT)
+        break
       }
 
       case 'Identifier': {
         switch (node.name) {
           case 'undefined': {
             this.bc.push(Bytecode.PushVoid)
-            break;
+            break
           }
           default: {
             this.bc.push(Bytecode.GetVar, node.name)
           }
         }
-        break;
+        break
       }
 
       case 'FunctionExpression':
       case 'ArrowFunctionExpression': {
-        const id = this.visitFunction(node);
+        const id = this.visitFunction(node)
         this.bc.push(Bytecode.NewFn, id)
-        break;
+        break
       }
 
       case 'CallExpression': {
@@ -509,26 +511,26 @@ class Parser {
           case 'MemberExpression': {
             opcode = Bytecode.CallMethod
             this.visitMemberExpression(callee, true)
-            break;
+            break
           }
           case 'V8IntrinsicIdentifier': {
             // none
-            break;
+            break
           }
           default: {
             this.visitExpression(callee)
           }
         }
 
-        args.forEach(v => this.visitExpression(v as Expression))
+        args.forEach((v) => this.visitExpression(v as Expression))
 
         this.bc.push(opcode, args.length)
-        break;
+        break
       }
       case 'ConditionalExpression': {
         const end = this.newLabel()
         const alter = this.newLabel()
-        this.visitExpression(node.test);
+        this.visitExpression(node.test)
         this.emitGoto(Bytecode.IfFalse, alter)
 
         this.visitExpression(node.consequent)
@@ -538,30 +540,30 @@ class Parser {
         this.visitExpression(node.alternate)
 
         this.emitLabel(end)
-        break;
+        break
       }
 
       case 'ObjectExpression': {
         this.bc.push(Bytecode.Object)
-        node.properties.forEach(prop => {
-          switch(prop.type) {
+        node.properties.forEach((prop) => {
+          switch (prop.type) {
             case 'ObjectProperty': {
-              this.visitExpression(prop.value as Expression)
+              this.visitExpression(prop.value as t.Expression)
               if (prop.computed) {
-                this.visitExpression(prop.key)
+                this.visitExpression(prop.key as t.Expression)
                 this.bc.push(Bytecode.DefineArrayElement)
               } else {
-                this.bc.push(Bytecode.DefineField, this.getIdentify(prop.key as LVal))
+                this.bc.push(Bytecode.DefineField, this.getIdentify(prop.key as t.LVal))
               }
-              break;
+              break
             }
           }
         })
-        break;
+        break
       }
 
       case 'ArrayExpression': {
-        node.elements.forEach(expr => {
+        node.elements.forEach((expr) => {
           if (expr === null) {
             this.bc.push(Bytecode.PushVoid)
           } else if (expr.type === 'SpreadElement') {
@@ -571,12 +573,12 @@ class Parser {
           }
         })
         this.bc.push(Bytecode.ArrayFrom, node.elements.length)
-        break;
+        break
       }
 
       case 'MemberExpression': {
-        this.visitMemberExpression(node);
-        break;
+        this.visitMemberExpression(node)
+        break
       }
 
       case 'UpdateExpression': {
@@ -593,17 +595,17 @@ class Parser {
         if (!node.prefix) {
           this.bc.push(Bytecode.Drop)
         }
-        break;
+        break
       }
 
       case 'ThisExpression': {
-        this.bc.push(Bytecode.GetVar, 'this');
-        break;
+        this.bc.push(Bytecode.GetVar, 'this')
+        break
       }
 
       case 'NewExpression': {
         this.warn(`Unimplement: ${node.type}`)
-        break;
+        break
       }
 
       default: {
@@ -612,8 +614,8 @@ class Parser {
     }
   }
 
-  private getIdentify(node: LVal): string {
-    switch(node.type) {
+  private getIdentify(node: t.LVal): string {
+    switch (node.type) {
       case 'Identifier': {
         return node.name
       }
@@ -625,7 +627,7 @@ class Parser {
     }
   }
 
-  private visitLVal(node: LVal, lvalMode: number) {
+  private visitLVal(node: t.LVal, lvalMode: number) {
     const isAssignment = (lvalMode & LVAL_ASSIGNMENT) === LVAL_ASSIGNMENT
     switch (node.type) {
       case 'Identifier': {
@@ -639,27 +641,28 @@ class Parser {
         if (isAssignment) {
           this.bc.push(Bytecode.SetVar, node.name)
         }
-        break;
+        break
       }
       case 'AssignmentPattern': {
         return unsupported('LVal AssignmengPattern')
-        break;
+        break
       }
       case 'ObjectPattern': {
         const usedKeys: string[] = []
-        node.properties.forEach(prop => {
+        node.properties.forEach((prop) => {
           switch (prop.type) {
             case 'ObjectProperty': {
               const { key, value } = prop
               if (prop.computed) {
                 switch (key.type) {
-                  case 'Identifier': {}
+                  case 'Identifier': {
+                  }
                 }
               } else {
                 t.assertIdentifier(key)
                 usedKeys.push(key.name)
                 if (isAssignment) {
-                  this.bc.push(Bytecode.GetField, key.name);
+                  this.bc.push(Bytecode.GetField, key.name)
                 }
               }
 
@@ -670,15 +673,15 @@ class Parser {
               if (isAssignment) {
                 this.bc.push(Bytecode.Drop)
               }
-              break;
+              break
             }
             case 'RestElement': {
               return unsupported('Pattern RestElement')
-              break;
+              break
             }
           }
         })
-        break;
+        break
       }
 
       case 'MemberExpression': {
@@ -688,9 +691,9 @@ class Parser {
           this.visitExpression(node.property as Expression)
         } else {
           // TODO: as
-          this.bc.push(Bytecode.SetField, this.getIdentify(node.property as LVal))
+          this.bc.push(Bytecode.SetField, this.getIdentify(node.property as t.LVal))
         }
-        break;
+        break
       }
     }
   }
@@ -715,11 +718,11 @@ class Parser {
 
     switch (node.left.type) {
       case 'VariableDeclaration': {
-        const isConst = node.left.kind === 'const'
-        node.left.declarations.forEach(v => {
+        // const isConst = node.left.kind === "const";
+        node.left.declarations.forEach((v) => {
           this.visitLVal(v.id, LVAL_ASSIGNMENT)
         })
-        break;
+        break
       }
       default: {
         this.visitLVal(node.left, LVAL_ASSIGNMENT)
@@ -751,23 +754,23 @@ class Parser {
       parser.currentScope.vars.push({
         name: 'this',
         isConst: true,
-        isArg: false
+        isArg: false,
       })
       parser.bc.push(Bytecode.PushThis)
       parser.bc.push(Bytecode.SetVar, 'this')
     }
 
     node.params.forEach((param, i) => {
-      switch(param.type) {
+      switch (param.type) {
         case 'Identifier': {
           parser.currentScope.vars.push({
             name: param.name,
             isConst: false,
-            isArg: true
+            isArg: true,
           })
           parser.bc.push(Bytecode.GetVarFromArg, i)
           parser.bc.push(Bytecode.SetVar, param.name)
-          break;
+          break
         }
       }
     })
@@ -778,7 +781,7 @@ class Parser {
   }
 
   private visitMemberExpression(node: t.MemberExpression, keepReference: boolean = false) {
-    this.visitExpression(node.object);
+    this.visitExpression(node.object)
     if (node.computed) {
       // TODO: as
       this.visitExpression(node.property as t.Expression)
@@ -805,7 +808,7 @@ class Parser {
       this.bc.push(Bytecode.Drop)
     }
 
-    node.body.body.forEach(stat => this.visitStatement(stat))
+    node.body.body.forEach((stat) => this.visitStatement(stat))
 
     this.popScope()
   }
@@ -816,7 +819,7 @@ class Parser {
 
   toFunctionBytecode(): FunctionBytecode {
     for (let i = 0; i < this.labels.length; i++) {
-      const ls = this.labels[i];
+      const ls = this.labels[i]
       for (let pos of ls.refs) {
         this.bc[pos + 1] = ls.pos
       }
@@ -826,8 +829,11 @@ class Parser {
       codes: this.bc,
       maxValueStackSize: 100,
       argNames: [],
-      scopeNames: this.scopes.map(scope => [scope.vars.filter(v => !v.isConst).map(v => v.name), scope.vars.filter(v => v.isConst).map(v => v.name)]),
-      children: this.children.map(child => child.toFunctionBytecode())
+      scopeNames: this.scopes.map((scope) => [
+        scope.vars.filter((v) => !v.isConst).map((v) => v.name),
+        scope.vars.filter((v) => v.isConst).map((v) => v.name),
+      ]),
+      children: this.children.map((child) => child.toFunctionBytecode()),
     }
   }
 }
@@ -841,14 +847,14 @@ export function parseExpression(sourceCode: string) {
 }
 
 export function parseScript(ctx: Context, code: string): JSValue {
-  const parsedFile = _parse(code);
-  const parser = new Parser(ctx);
+  const parsedFile = _parse(code)
+  const parser = new Parser(ctx)
   parser.visitFile(parsedFile)
 
   const fn = newFunctionObject(ctx, parser.toFunctionBytecode(), new Scope(undefined))
 
   return {
     type: JSValueType.Object,
-    value: fn
+    value: fn,
   }
 }

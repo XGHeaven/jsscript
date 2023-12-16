@@ -1,4 +1,4 @@
-import { JSValue } from "./value"
+import { JSValue } from './value'
 
 export interface ValueBindOption {
   isConst?: boolean
@@ -18,8 +18,7 @@ export class Scope {
   protected store = new Map<string, JSValue>()
   protected values = new Map<string, ValueState>()
 
-  constructor(public parent: Scope | undefined) {
-  }
+  constructor(public parent: Scope | undefined) {}
 
   getOwn(key: string): JSValue | undefined {
     return this.values.get(key)?.value
@@ -48,7 +47,7 @@ export class Scope {
     this.values.set(key, {
       option,
       name: key,
-      value: undefined
+      value: undefined,
     })
   }
 

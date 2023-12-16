@@ -4,15 +4,19 @@ import { HostFunction, JSNewHostFunction } from '../function'
 import { JSDefinePropertyValue, JS_PROPERTY_C_W, JS_PROPERTY_NONE } from '../object'
 import { JSValue, createHostValue } from '../value'
 
-type FilterType2<O extends Record<any, any>, K extends keyof O, T> = K extends any ? O[K] extends T ? T extends O[K] ? K : never : never : never;
+type FilterType2<O extends Record<any, any>, K extends keyof O, T> = K extends any
+  ? O[K] extends T
+    ? T extends O[K]
+      ? K
+      : never
+    : never
+  : never
 
 export type FilterType<O extends Record<any, any>, T> = {
-  [K in keyof O]: O[K] extends T ? T extends O[K] ? O[K] : never : never
+  [K in keyof O]: O[K] extends T ? (T extends O[K] ? O[K] : never) : never
 }
 
 export type FilterTypeKeys<O extends Record<any, any>, T> = FilterType2<O, keyof O, T>
-
-type Z = FilterType<NumberConstructor, number>
 
 enum DefineType {
   HostFunction,
@@ -48,7 +52,7 @@ export function defHostFunction(name: string, fn: HostFunction, length: number):
     name,
     fn,
     length,
-    flags: JS_PROPERTY_C_W
+    flags: JS_PROPERTY_C_W,
   }
 }
 
@@ -57,7 +61,7 @@ export function defHostValue(name: string, value: HostValue): PropertyHostValueD
     type: DefineType.HostValue,
     name,
     value,
-    flags: JS_PROPERTY_C_W
+    flags: JS_PROPERTY_C_W,
   }
 }
 
@@ -66,18 +70,18 @@ export function defHostValueImmutable(name: string, value: HostValue): PropertyH
     type: DefineType.HostValue,
     name,
     value,
-    flags: JS_PROPERTY_NONE
+    flags: JS_PROPERTY_NONE,
   }
 }
 
 export function JSApplyPropertyDefinitions(ctx: Context, obj: JSValue, defintions: PropertyDefinitions) {
   for (const def of defintions) {
-    const {name, flags} = def
+    const { name, flags } = def
     let value: JSValue
     switch (def.type) {
       case DefineType.HostFunction: {
         value = JSNewHostFunction(ctx, def.fn, name as string, def.length)
-        break;
+        break
       }
       case DefineType.HostValue: {
         value = createHostValue(def.value)
@@ -85,7 +89,7 @@ export function JSApplyPropertyDefinitions(ctx: Context, obj: JSValue, defintion
       }
     }
     if (!value) {
-      continue;
+      continue
     }
     JSDefinePropertyValue(ctx, obj, name, value, flags)
   }

@@ -9,18 +9,21 @@
     "test262": "test262-harness --hostType engine262 --hostPath ./bin/jsscript --host-args=\"--test262\" --saveOnlyFailed",
     "test262:ci": "node ./scripts/test262.js",
     "test262:analysis": "node ./scripts/analysis.js",
-    "build": "tsc"
+    "build": "tsc",
+    "fmt": "prettier -w './src/**/*.ts'",
+    "fmt:check": "prettier -c './src/**/*.ts'"
   },
   "author": "XGHeaven <xgheaven@gmail.com>",
   "license": "ISC",
   "devDependencies": {
-    "@types/node": "^20.9.4",
-    "test262-harness": "^9.0.0",
-    "typescript": "^4.3.2"
+    "@types/node": "^20.10.4",
+    "prettier": "^3.1.1",
+    "test262-harness": "^9.2.0",
+    "typescript": "^4.9.5"
   },
   "dependencies": {
-    "@babel/parser": "^7.14.4",
-    "@babel/types": "^7.14.4",
-    "acorn": "^8.3.0"
+    "@babel/parser": "^7.23.6",
+    "@babel/types": "^7.23.6",
+    "acorn": "^8.11.2"
   }
 }

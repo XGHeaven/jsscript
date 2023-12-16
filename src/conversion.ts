@@ -1,40 +1,63 @@
-import { Context } from "./context";
-import { JSThrowTypeError } from "./error";
-import { JSBoolValue, JSExpectionValue, JSNumberValue, JSObjectValue, JSStringValue, JSValue, JSValueType, JS_NAN, JS_UNDEFINED, createBoolValue, createNumberValue, createStringValue, isObjectValue, isUseHostValue } from "./value";
+import { Context } from './context'
+import { JSThrowTypeError } from './error'
+import {
+  JSBoolValue,
+  JSExpectionValue,
+  JSNumberValue,
+  JSObjectValue,
+  JSValue,
+  JSValueType,
+  JS_NAN,
+  JS_UNDEFINED,
+  createBoolValue,
+  createNumberValue,
+  createStringValue,
+  isObjectValue,
+  isUseHostValue,
+} from './value'
 
 export function JSToString(ctx: Context, value: JSValue): JSValue {
-  switch(value.type) {
+  switch (value.type) {
     case JSValueType.Bool:
     case JSValueType.Number:
     case JSValueType.Null:
-    case JSValueType.Undefined: return createStringValue(`${value.value}`)
+    case JSValueType.Undefined:
+      return createStringValue(`${value.value}`)
     case JSValueType.Exception:
-    case JSValueType.String: return value
+    case JSValueType.String:
+      return value
     case JSValueType.Symbol: {
       return JSThrowTypeError(ctx, 'cannot convert symbol to a string')
     }
     case JSValueType.Object: {
       const priVal = JSToPrimitive(ctx, value, ToPrimitivePreferredType.String)
-      return JSToString(ctx, priVal);
+      return JSToString(ctx, priVal)
     }
   }
+  return JSThrowTypeError(ctx, `JSToString: unexpected type ${value.type}`)
 }
 
 export const enum ToPrimitivePreferredType {
   String,
-  Number
+  Number,
 }
 
-export function JSToPrimitive(ctx: Context, value: JSValue, preferredType: ToPrimitivePreferredType = ToPrimitivePreferredType.Number): JSValue {
+export function JSToPrimitive(
+  ctx: Context,
+  value: JSValue,
+  preferredType: ToPrimitivePreferredType = ToPrimitivePreferredType.Number
+): JSValue {
   if (isObjectValue(value)) {
     return JSOridinaryToPrimitive(ctx, value, preferredType)
   }
   return value
 }
 
-
-
-export function JSOridinaryToPrimitive(ctx: Context, value: JSObjectValue, preferredType: ToPrimitivePreferredType): JSValue {
+export function JSOridinaryToPrimitive(
+  ctx: Context,
+  value: JSObjectValue,
+  preferredType: ToPrimitivePreferredType
+): JSValue {
   // switch(value.type) {
   //   case JSValueType.Bool:
   //   case JSValueType.Undefined:
@@ -49,19 +72,22 @@ export function JSOridinaryToPrimitive(ctx: Context, value: JSObjectValue, prefe
   return JS_UNDEFINED
 }
 
-
 export function JSToNumber(ctx: Context, value: JSValue): JSNumberValue | JSExpectionValue {
-  switch(value.type) {
-    case JSValueType.Number: return value;
+  switch (value.type) {
+    case JSValueType.Number:
+      return value
     case JSValueType.Bool: {
       if (value.value === true) {
         return createNumberValue(1)
       }
       // fallthrough to 0
     }
-    case JSValueType.Null: return createNumberValue(0)
-    case JSValueType.Undefined: return JS_NAN
-    case JSValueType.String: return createNumberValue(+value.value)
+    case JSValueType.Null:
+      return createNumberValue(0)
+    case JSValueType.Undefined:
+      return JS_NAN
+    case JSValueType.String:
+      return createNumberValue(+value.value)
   }
   // TODO: assert is an object
   const pri = JSToPrimitive(ctx, value, ToPrimitivePreferredType.Number)

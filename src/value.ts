@@ -1,9 +1,7 @@
-import { Context } from "./context"
-import { Scope } from "./scope"
-import { BlockStatement, FunctionExpression, Identifier, Pattern, RestElement } from '@babel/types'
-import { EnvironmentRecord } from "./environment"
-import { Bytecodes } from "./bytecode"
-import { JSObject, JSObjectType, toHostObject } from "./object"
+import { Context } from './context'
+import { Scope } from './scope'
+import { Bytecodes } from './bytecode'
+import { JSObject, JSObjectType, toHostObject } from './object'
 
 export enum JSValueType {
   Undefined,
@@ -25,7 +23,7 @@ export interface JSCoreValue {
 }
 
 export interface JSNumberValue {
-  type: JSValueType.Number,
+  type: JSValueType.Number
   value: number
 }
 
@@ -40,12 +38,12 @@ export interface JSStringValue {
 }
 
 export interface JSObjectValue {
-  type: JSValueType.Object,
+  type: JSValueType.Object
   value: JSObject
 }
 
 export interface JSSymbolValue {
-  type: JSValueType.Symbol,
+  type: JSValueType.Symbol
   value: symbol
 }
 
@@ -59,12 +57,12 @@ export interface JSExpectionValue {
 }
 
 export interface JSNullValue {
-  type: JSValueType.Null,
+  type: JSValueType.Null
   value: null
 }
 
 export interface JSTryContextValue {
-  type: JSValueType.TryContext,
+  type: JSValueType.TryContext
   value: number
   scope: Scope
 }
@@ -81,36 +79,36 @@ export type JSValue = JSInstrinsicValue | JSExpectionValue | JSTryContextValue
 
 export const JS_UNDEFINED: JSUndefinedValue = {
   type: JSValueType.Undefined,
-  value: undefined
+  value: undefined,
 }
 
-export const JS_EXCEPTION : JSExpectionValue = {
-  type: JSValueType.Exception
+export const JS_EXCEPTION: JSExpectionValue = {
+  type: JSValueType.Exception,
 }
 
 export const JS_NULL: JSNullValue = {
   type: JSValueType.Null,
-  value: null
+  value: null,
 }
 
 export const JS_NAN: JSNumberValue = {
   type: JSValueType.Number,
-  value: NaN
+  value: NaN,
 }
 
 export const JS_INFINITY: JSNumberValue = {
   type: JSValueType.Number,
-  value: Infinity
+  value: Infinity,
 }
 
 export const JS_TRUE: JSBoolValue = {
   type: JSValueType.Bool,
-  value: true
+  value: true,
 }
 
 export const JS_FALSE: JSBoolValue = {
   type: JSValueType.Bool,
-  value: false
+  value: false,
 }
 
 export const JS_EMPTY_STRING = createStringValue('')
@@ -118,14 +116,14 @@ export const JS_EMPTY_STRING = createStringValue('')
 export function createNumberValue(num: number): JSNumberValue {
   return {
     type: JSValueType.Number,
-    value: num
+    value: num,
   }
 }
 
 export function createStringValue(str: string): JSStringValue {
   return {
     type: JSValueType.String,
-    value: str
+    value: str,
   }
 }
 
@@ -137,7 +135,7 @@ export function createTryContextValue(pos: number, scope: Scope): JSTryContextVa
   return {
     type: JSValueType.TryContext,
     value: pos,
-    scope
+    scope,
   }
 }
 
@@ -149,12 +147,27 @@ export interface FunctionBytecode {
   children: FunctionBytecode[]
 }
 
-export function isPrimitiveValue(value: JSValue): value is JSBoolValue | JSNumberValue | JSStringValue | JSSymbolValue | JSUndefinedValue {
-  return value.type === JSValueType.Bool || value.type === JSValueType.Number || value.type === JSValueType.String || value.type === JSValueType.Symbol || value.type === JSValueType.Undefined
+export function isPrimitiveValue(
+  value: JSValue
+): value is JSBoolValue | JSNumberValue | JSStringValue | JSSymbolValue | JSUndefinedValue {
+  return (
+    value.type === JSValueType.Bool ||
+    value.type === JSValueType.Number ||
+    value.type === JSValueType.String ||
+    value.type === JSValueType.Symbol ||
+    value.type === JSValueType.Undefined
+  )
 }
 
-export function isUseHostValue(value: JSValue): value is JSBoolValue | JSNumberValue | JSStringValue | JSUndefinedValue {
-  return value.type === JSValueType.Bool || value.type === JSValueType.Number || value.type === JSValueType.String || value.type === JSValueType.Undefined
+export function isUseHostValue(
+  value: JSValue
+): value is JSBoolValue | JSNumberValue | JSStringValue | JSUndefinedValue {
+  return (
+    value.type === JSValueType.Bool ||
+    value.type === JSValueType.Number ||
+    value.type === JSValueType.String ||
+    value.type === JSValueType.Undefined
+  )
 }
 
 export function isExceptionValue(value: JSValue): value is JSExpectionValue {
@@ -206,10 +219,14 @@ export function valueToString(value: JSValue): string {
   switch (value.type) {
     case JSValueType.Bool:
     case JSValueType.String:
-    case JSValueType.Number: return value.value.toString()
-    case JSValueType.Undefined: return 'undefined'
-    case JSValueType.Object: return `[object Object]`
-    case JSValueType.Null: return 'null'
+    case JSValueType.Number:
+      return value.value.toString()
+    case JSValueType.Undefined:
+      return 'undefined'
+    case JSValueType.Object:
+      return `[object Object]`
+    case JSValueType.Null:
+      return 'null'
     default: {
       return 'UNKNOWN_VALUE'
     }
@@ -217,16 +234,24 @@ export function valueToString(value: JSValue): string {
 }
 
 export function formatValue(value: JSValue): string {
-  switch(value.type) {
+  switch (value.type) {
     case JSValueType.Bool:
-    case JSValueType.Number: return `${value.value}`
-    case JSValueType.String: return `"${value.value}"`
-    case JSValueType.Object: return `[object ${value.type}]`
-    case JSValueType.Undefined: return 'undefined'
-    case JSValueType.Exception: return `[expection]`
-    case JSValueType.Null: return `null`
-    case JSValueType.Symbol: return `[Symbol]`
-    case JSValueType.TryContext: return `[trycontext]`
+    case JSValueType.Number:
+      return `${value.value}`
+    case JSValueType.String:
+      return `"${value.value}"`
+    case JSValueType.Object:
+      return `[object ${value.type}]`
+    case JSValueType.Undefined:
+      return 'undefined'
+    case JSValueType.Exception:
+      return `[expection]`
+    case JSValueType.Null:
+      return `null`
+    case JSValueType.Symbol:
+      return `[Symbol]`
+    case JSValueType.TryContext:
+      return `[trycontext]`
   }
 }
 
@@ -235,11 +260,15 @@ export function toHostValue(value: JSValue, transferedSets: WeakSet<object> = ne
     case JSValueType.Bool:
     case JSValueType.Number:
     case JSValueType.String:
-    case JSValueType.Undefined: return value.value
-    case JSValueType.Null: return null
-    case JSValueType.Object: return toHostObject(value.value, transferedSets)
+    case JSValueType.Undefined:
+      return value.value
+    case JSValueType.Null:
+      return null
+    case JSValueType.Object:
+      return toHostObject(value.value, transferedSets)
 
-    case JSValueType.Exception: return null
+    case JSValueType.Exception:
+      return null
   }
 }
 
@@ -258,20 +287,27 @@ function typeofFn(v: any) {
 type TypeofType = ReturnType<typeof typeofFn>
 
 export function typeofValue(ctx: Context, value: JSValue): TypeofType {
-  switch(value.type) {
-    case JSValueType.Bool: return 'boolean'
-    case JSValueType.Number: return 'number'
-    case JSValueType.String: return 'string'
-    case JSValueType.Symbol: return 'symbol'
-    case JSValueType.Undefined: return 'undefined'
-    case JSValueType.Null: return 'object'
+  switch (value.type) {
+    case JSValueType.Bool:
+      return 'boolean'
+    case JSValueType.Number:
+      return 'number'
+    case JSValueType.String:
+      return 'string'
+    case JSValueType.Symbol:
+      return 'symbol'
+    case JSValueType.Undefined:
+      return 'undefined'
+    case JSValueType.Null:
+      return 'object'
     case JSValueType.Object: {
       if (value.value.type === JSObjectType.Function || ctx.runtime.classes[value.value.type].call) {
         return 'function'
       }
       return 'object'
     }
-    default: return 'object'
+    default:
+      return 'object'
   }
 }
 
@@ -280,7 +316,8 @@ export function isValueTruly(value: JSValue): boolean {
     return !!value.value
   }
   switch (value.type) {
-    case JSValueType.Object: return true;
+    case JSValueType.Object:
+      return true
   }
 
   return false

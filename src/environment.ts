@@ -1,21 +1,22 @@
-import { Context } from "./context";
-import { JSValue } from "./value";
+import { Context } from './context'
+import { JSValue } from './value'
 
 enum BindingType {
   Mutable,
-  Immutable
+  Immutable,
 }
 
 interface BindingRecord {
-  type: BindingType,
+  type: BindingType
   value: JSValue | null
 }
 
 export abstract class EnvironmentRecord {
   protected store = new Map<string, BindingRecord>()
-  constructor(public context: Context, public parent: EnvironmentRecord | null) {
-
-  }
+  constructor(
+    public context: Context,
+    public parent: EnvironmentRecord | null
+  ) {}
 
   // abstract hasBinding(name: string): boolean
   // abstract createMutableBinding(name: string, isDelete: boolean): void
@@ -34,14 +35,14 @@ export abstract class EnvironmentRecord {
   createMutableBinding(name: string, isDelete: boolean): void {
     const record: BindingRecord = {
       type: BindingType.Mutable,
-      value: null
+      value: null,
     }
     this.store.set(name, record)
   }
   createImmutableBinding(name: string, safe: boolean): void {
     this.store.set(name, {
       type: BindingType.Immutable,
-      value: null
+      value: null,
     })
   }
   initializeBinding(name: string, value: JSValue): void {
@@ -61,16 +62,16 @@ export abstract class EnvironmentRecord {
     return this.store.get(name)!.value!
   }
   deleteBinding(name: string): boolean {
-    throw new Error("Method not implemented.");
+    throw new Error('Method not implemented.')
   }
   hasThisBinding(): boolean {
-    throw new Error("Method not implemented.");
+    throw new Error('Method not implemented.')
   }
   hasSuperBinding(): boolean {
-    throw new Error("Method not implemented.");
+    throw new Error('Method not implemented.')
   }
   withBaseObject(): JSValue | undefined {
-    throw new Error("Method not implemented.");
+    throw new Error('Method not implemented.')
   }
 }
 
@@ -117,9 +118,7 @@ export class LexcialEnvironmentRecord extends EnvironmentRecord {
   // }
 }
 
-export class GlobalEnvironmentRecord extends EnvironmentRecord {
-
-}
+export class GlobalEnvironmentRecord extends EnvironmentRecord {}
 
 export function isEnvironment(env: any): env is EnvironmentRecord {
   return env instanceof EnvironmentRecord

@@ -1,10 +1,10 @@
-import { JSValue } from "../value";
+import { JSValue } from '../value'
 
 export enum CompletionType {
   Normal,
   Throw,
   AwaitFulfilled,
-  AwaitRejected
+  AwaitRejected,
 }
 
 export interface CoreCompletion {
@@ -28,7 +28,7 @@ export function normalCompletion(value: JSValue): NormalCompletion {
     __type: 'completion',
     type: CompletionType.Normal,
     value,
-    target: null
+    target: null,
   }
 }
 
@@ -37,10 +37,10 @@ export function throwCompletion(value: JSValue): ThrowCompletion {
     __type: 'completion',
     type: CompletionType.Throw,
     value,
-    target: null
+    target: null,
   }
 }
 
-export function isCompletion(node: any) : node is CompletionRecord {
+export function isCompletion(node: any): node is CompletionRecord {
   return node.__type === 'completion'
 }

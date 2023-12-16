@@ -1,7 +1,7 @@
-import { Context } from "./context";
-import { JSFunctionObject, getObjectData } from "./object";
-import { Scope } from "./scope";
-import { JSValue, JS_UNDEFINED } from "./value";
+import { Context } from './context'
+import { JSFunctionObject, getObjectData } from './object'
+import { Scope } from './scope'
+import { JSValue, JS_UNDEFINED } from './value'
 
 export interface StackFrame {
   context: Context
