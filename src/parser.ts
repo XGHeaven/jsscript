@@ -604,6 +604,15 @@ class Parser {
       }
 
       case 'NewExpression': {
+        this.visitExpression(node.callee as t.Expression)
+        this.bc.push(Bytecode.Dup)
+        // TODO
+        node.arguments.forEach((arg) => this.visitExpression(arg as t.Expression))
+        this.bc.push(Bytecode.CallConstructor, node.arguments.length)
+        break
+      }
+
+      case 'Super': {
         this.warn(`Unimplement: ${node.type}`)
         break
       }

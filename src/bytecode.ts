@@ -52,6 +52,8 @@ export enum Bytecode {
   Call,
   // (argc: number) (thisObject fnObject ...args) => (ret)
   CallMethod,
+  // (argc: number) (fnObject newTargetObject ...args) => (ret)
+  CallConstructor,
   Apply,
   Return,
   // Drop value

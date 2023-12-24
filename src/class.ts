@@ -1,5 +1,6 @@
 import { Context } from './context'
 import { JSThrowTypeError } from './error'
+import { HostFunctionType } from './function'
 import { getObjectData as getObjectData, JSHostFunctionObject, JSObjectType } from './object'
 import { Runtime } from './runtime'
 import { JSObjectValue, JSValue, JS_UNDEFINED } from './value'
@@ -26,18 +27,18 @@ const hostFunctionCallHandler: JSClassCall = (ctx, fnObj, thisObj, args, isNew) 
   const hostFn = data.fn
 
   let thisOrTarget: JSValue
-  if (isNew) {
-    if (data.ctr) {
+  switch (data.type) {
+    case HostFunctionType.Constructor:
+      if (!isNew) return JSThrowTypeError(ctx, 'must be called with new')
       thisOrTarget = fnObj
-    } else {
-      thisOrTarget = JS_UNDEFINED
-    }
-  } else {
-    if (data.ctr) {
-      return JSThrowTypeError(ctx, 'Class constructor cannot be invoked without "new"')
-    } else {
+      break
+    case HostFunctionType.ConstructorOrFunction:
+      thisOrTarget = isNew ? fnObj : JS_UNDEFINED
+      break
+    case HostFunctionType.Function:
+      if (isNew) return JSThrowTypeError(ctx, 'not a constructor')
       thisOrTarget = thisObj
-    }
+      break
   }
 
   const returnValue = hostFn(ctx, thisOrTarget, args)

@@ -21,8 +21,8 @@ import { createStackFrame } from './frame'
 import {
   JSDefinePropertyValue,
   JSFunctionObject,
+  getPropertyLikeJS,
   JSGetProperty,
-  JSGetPropertyValue,
   JSIteratorObjectNext,
   JSNewForInIteratorObject,
   JSNewPlainObject,
@@ -30,12 +30,12 @@ import {
   JSSetPropertyValue,
   JS_PROPERTY_C_W_E,
   getObjectData,
-  newArrayValue,
 } from './object'
+import { JSNewArray } from './array'
 import { Scope } from './scope'
 import { JSThrow, JSThrowTypeError } from './error'
 import { JSAtom } from './atom'
-import { JSNewFunctionObject } from './function'
+import { JSNewFunctionObject, callConstructor } from './function'
 import { debug } from './log'
 import { JSToNotBoolean, JSToNumber } from './conversion'
 
@@ -120,6 +120,7 @@ export function callInternal(
         break
       }
       case Bytecode.Call:
+      case Bytecode.CallConstructor:
       case Bytecode.CallMethod: {
         const argc = ops[pc++] as number
         const args = v.slice(sp - argc + 1, sp + 1)
@@ -129,7 +130,11 @@ export function callInternal(
         sp -= argc
         const fnValue = v[sp]
         const thisValue = op === Bytecode.CallMethod ? v[--sp] : JS_UNDEFINED
-        const returnValue = callInternal(ctx, fnValue, thisValue, JS_UNDEFINED, args)
+        const newTargetValue = op === Bytecode.CallConstructor ? v[--sp] : JS_UNDEFINED
+        const returnValue =
+          op === Bytecode.CallConstructor
+            ? callConstructor(ctx, fnValue, newTargetValue, args)
+            : callInternal(ctx, fnValue, thisValue, newTargetValue, args)
         debug(`\tCallReturn: ${formatValue(returnValue)}`)
         if (!isExceptionValue(returnValue)) {
           v[sp] = returnValue
@@ -147,7 +152,7 @@ export function callInternal(
           v[++sp] = value
           debug(`\t${name}=${formatValue(value!)}`)
         } else {
-          const globalValue = JSGetProperty(ctx, ctx.globalValue, name, JS_UNDEFINED, true)
+          const globalValue = getPropertyLikeJS(ctx, ctx.globalValue, name, JS_UNDEFINED, true)
           if (!isExceptionValue(globalValue)) {
             debug(`\tglobal ${name}=${formatValue(globalValue)}`)
             v[++sp] = globalValue
@@ -220,7 +225,7 @@ export function callInternal(
       case Bytecode.GetAarryElement: {
         const prop = valueToString(v[sp--])
         const obj = v[sp]
-        const val = JSGetPropertyValue(ctx, obj, prop)
+        const val = JSGetProperty(ctx, obj, prop)
         if (!isExceptionValue(val)) {
           v[++sp] = val
         }
@@ -229,7 +234,7 @@ export function callInternal(
       case Bytecode.GetArrayElementReplace: {
         const prop = valueToString(v[sp--])
         const obj = v[sp]
-        const val = JSGetPropertyValue(ctx, obj, prop)
+        const val = JSGetProperty(ctx, obj, prop)
         if (!isExceptionValue(val)) {
           v[++sp] = val
         }
@@ -237,7 +242,8 @@ export function callInternal(
       }
       case Bytecode.GetField: {
         const name = ops[pc++] as string
-        const val = JSGetPropertyValue(ctx, v[sp], name)
+        const val = JSGetProperty(ctx, v[sp], name)
+        debug(`\t${String(name)} ${formatValue(val)}`)
         if (!isExceptionValue(val)) {
           v[++sp] = val
         }
@@ -245,7 +251,8 @@ export function callInternal(
       }
       case Bytecode.GetFieldReplace: {
         const name = ops[pc++] as JSAtom
-        const val = JSGetPropertyValue(ctx, v[sp], name)
+        const val = JSGetProperty(ctx, v[sp], name)
+        debug(`\t${String(name)} ${formatValue(val)}`)
         if (!isExceptionValue(val)) {
           v[sp] = val
         }
@@ -258,7 +265,7 @@ export function callInternal(
       }
       case Bytecode.ArrayFrom: {
         const argc = ops[pc++] as number
-        const array = newArrayValue(ctx)
+        const array = JSNewArray(ctx)
         for (let i = argc - 1; i >= 0; i--) {
           JSDefinePropertyValue(ctx, array, argc - 1 - i, v[sp - i], JS_PROPERTY_C_W_E)
         }

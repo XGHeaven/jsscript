@@ -1,10 +1,10 @@
 import { Context } from '../context'
 import { JSToNumber } from '../conversion'
-import { JSNewHostFunction } from '../function'
+import { HostFunctionType, JSNewHostFunction } from '../function'
 import { JSDefinePropertyValue, JSNewPlainObject, propertyFlagsFromDescriptor } from '../object'
 import { createHostValue, createNumberValue, isExceptionValue } from '../value'
 
-export function initMath(ctx: Context) {
+export function JSAddBuiltinMath(ctx: Context) {
   const mathObj = JSNewPlainObject(ctx)
 
   for (const [name, desc] of Object.entries(Object.getOwnPropertyDescriptors(Math))) {
@@ -27,7 +27,8 @@ export function initMath(ctx: Context) {
             return createNumberValue(value(...numbers))
           },
           name,
-          argc
+          argc,
+          HostFunctionType.Function
         )
         JSDefinePropertyValue(ctx, mathObj, name, fnObj, propertyFlagsFromDescriptor(desc))
       } else {
