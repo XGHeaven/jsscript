@@ -1,13 +1,14 @@
 import { JSAtom } from './atom'
 import { Context } from './context'
-import { JSThrowReferenceErrorNotDefine, JSThrowTypeError, initNativeErrorProto } from './error'
-import { HostFunction, JSNewHostFunctionWithProto } from './function'
+import { JSThrowReferenceErrorNotDefine, JSThrowTypeError, JSInitErrorProto } from './error'
+import { HostFunction, HostFunctionType, JSNewHostFunctionWithProto } from './function'
 import { Runtime } from './runtime'
 import { Scope } from './scope'
 import {
   FunctionBytecode,
   JSNumberValue,
   JSObjectValue,
+  JSStringValue,
   JSValue,
   JSValueType,
   JS_NULL,
@@ -47,9 +48,12 @@ type JSObjectDataMap = {
   [JSObjectType.HostFunction]: {
     fn: HostFunction
     rt: Runtime
-    ctr: boolean
+    type: HostFunctionType
+    isConstructor: boolean
   }
+  [JSObjectType.Array]: unknown[]
   [JSObjectType.Number]: JSNumberValue
+  [JSObjectType.String]: JSStringValue
   [JSObjectType.ForInIterator]: {
     keys: string[]
     pos: number
@@ -154,28 +158,12 @@ export function makeObject<T extends number>(obj: JSObject<T>): JSObjectValue {
   }
 }
 
-export function JSNewObject2ProtoClass(ctx: Context, proto: JSValue, type: number) {
-  return JSNewObject(ctx, getProtoObject(ctx, proto), type)
+export function JSNewObjectProtoClass(ctx: Context, proto: JSValue, type: number) {
+  return JSNewObject(ctx, proto, type)
 }
 
 export function JSNewPlainObjectProto(ctx: Context, proto: JSValue) {
   return JSNewObject(ctx, proto, JSObjectType.Object)
-}
-
-export function newArray(ctx: Context): JSArrayObject {
-  return {
-    type: JSObjectType.Array,
-    props: [] as unknown as JSArrayObject['props'],
-    proto: getProtoObject(ctx, ctx.protos[JSObjectType.Array]),
-    data: undefined,
-  }
-}
-
-export function newArrayValue(ctx: Context): JSValue {
-  return {
-    type: JSValueType.Object,
-    value: newArray(ctx),
-  }
 }
 
 export function JSNewForInIteratorObject(ctx: Context, value: JSValue): JSValue {
@@ -244,6 +232,14 @@ export function JSSetPropertyValue(ctx: Context, objValue: JSValue, prop: JSAtom
   }
 
   let obj: JSObject | null = objValue.value
+
+  if (obj.type === JSObjectType.Array && prop === 'length') {
+    // TODO
+    const obj1 = obj as JSArrayObject
+    obj1.data.length = (value as JSNumberValue).value
+    return 0
+  }
+
   while (obj) {
     const pr = findOwnProperty(ctx, obj, prop)
     if (pr) {
@@ -292,15 +288,6 @@ export function JSDefineProperty(
 
   const obj = objValue.value
 
-  // TODO: convert prop to string
-  switch (obj.type) {
-    case JSObjectType.Array: {
-      if (prop === 'length') {
-        // TODO
-      }
-    }
-  }
-
   const pr = obj.props.get(prop)
   if (pr) {
     if (!pr.configure) {
@@ -342,14 +329,19 @@ export function JSCreateProperty(
   }
 
   obj.props.set(prop, p)
+
+  if (obj.type === JSObjectType.Array) {
+    // ((obj as JSArrayObject).data as any)[prop] = true
+  }
+
   return 0
 }
 
-export function JSGetPropertyValue(ctx: Context, obj: JSValue, prop: JSAtom) {
-  return JSGetProperty(ctx, obj, prop, obj, false)
+export function JSGetProperty(ctx: Context, obj: JSValue, prop: JSAtom) {
+  return getPropertyLikeJS(ctx, obj, prop, obj, false)
 }
 
-export function JSGetProperty(
+export function getPropertyLikeJS(
   ctx: Context,
   objValue: JSValue,
   prop: JSAtom,
@@ -424,12 +416,12 @@ export function JSNewObjectFromCtor(ctx: Context, ctor: JSValue, type: number) {
   if (ctor === JS_UNDEFINED) {
     proto = ctx.protos[type]
   } else {
-    proto = JSGetPropertyValue(ctx, ctor, 'prototype')
+    proto = JSGetProperty(ctx, ctor, 'prototype')
     if (isExceptionValue(proto)) {
       return proto
     }
   }
-  return JSNewObject2ProtoClass(ctx, proto, type)
+  return JSNewObjectProtoClass(ctx, proto, type)
 }
 
 export function JSGetPrototypePrimitive(ctx: Context, value: JSValue) {
@@ -447,13 +439,19 @@ export function JSGetPrototypePrimitive(ctx: Context, value: JSValue) {
 
 const emptyFn: HostFunction = () => JS_UNDEFINED
 
-export function initPrototype(ctx: Context) {
+export function JSInitBasicPrototype(ctx: Context) {
   const objProto = (ctx.objProto = ctx.protos[JSObjectType.Object] = JSNewObject(ctx, JS_NULL, JSObjectType.Object))
 
-  ctx.fnProto = ctx.protos[JSObjectType.Function] = JSNewHostFunctionWithProto(ctx, emptyFn, 'Function', 0, objProto)
+  ctx.fnProto = ctx.protos[JSObjectType.Function] = JSNewHostFunctionWithProto(
+    ctx,
+    emptyFn,
+    'Function',
+    0,
+    objProto,
+    HostFunctionType.ConstructorOrFunction
+  )
 
-  ctx.protos[JSObjectType.Error] = JSNewObject(ctx, objProto, JSObjectType.Error)
-  initNativeErrorProto(ctx)
+  JSInitErrorProto(ctx)
 
   ctx.protos[JSObjectType.Array] = JSNewObject(ctx, objProto, JSObjectType.Array)
 }

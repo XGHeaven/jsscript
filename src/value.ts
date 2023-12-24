@@ -170,6 +170,10 @@ export function isUseHostValue(
   )
 }
 
+export function isUndefinedValue(value: JSValue): value is JSUndefinedValue {
+  return value === JS_UNDEFINED
+}
+
 export function isExceptionValue(value: JSValue): value is JSExpectionValue {
   return value.type === JSValueType.Exception
 }
@@ -188,6 +192,14 @@ export function isTryContextValue(value: JSValue): value is JSTryContextValue {
 
 export function isNumberValue(value: JSValue): value is JSNumberValue {
   return value.type === JSValueType.Number
+}
+
+export function isStringValue(value: JSValue): value is JSStringValue {
+  return value.type === JSValueType.String
+}
+
+export function isEmptyStringValue(value: JSValue): boolean {
+  return value.type === JSValueType.String && value.value === ''
 }
 
 // export function isReferenceValue(value: JSValue): value is JSReferenceValue {

@@ -8,11 +8,14 @@ import {
   JSObject,
   JS_PROPERTY_CONFIGURE,
   JS_PROPERTY_C_W_E,
-  initPrototype,
+  JSInitBasicPrototype,
 } from './object'
 import { JSAtom } from './atom'
-import { initMath } from './builtin/Math'
-import { initNumber } from './builtin/Number'
+import { JSAddBuiltinMath } from './builtin/Math'
+import { JSAddBuiltinNumber } from './builtin/Number'
+import { JSAddBuiltinError } from './error'
+import { JSAddBuiltinString } from './builtin/String'
+import { JSAddBuiltinArray } from './builtin/Array'
 
 export class Context {
   globalValue: JSValue
@@ -29,7 +32,7 @@ export class Context {
   nativeErrorProtos: JSValue[] = []
 
   constructor(public runtime: Runtime) {
-    initPrototype(this)
+    JSInitBasicPrototype(this)
 
     this.globalValue = JSNewPlainObject(this)
     this.globalObject = (this.globalValue as JSObjectValue).value
@@ -38,8 +41,11 @@ export class Context {
     JSDefinePropertyValue(this, this.globalValue, 'NaN', JS_NAN, JS_PROPERTY_CONFIGURE)
     JSDefinePropertyValue(this, this.globalValue, 'Infinity', JS_INFINITY, JS_PROPERTY_CONFIGURE)
 
-    initMath(this)
-    initNumber(this)
+    JSAddBuiltinArray(this)
+    JSAddBuiltinError(this)
+    JSAddBuiltinMath(this)
+    JSAddBuiltinNumber(this)
+    JSAddBuiltinString(this)
   }
 
   run(fn: JSValue) {

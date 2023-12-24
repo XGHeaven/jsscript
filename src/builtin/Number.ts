@@ -1,7 +1,7 @@
 import { Context } from '../context'
 import { JSToNumber } from '../conversion'
 import { JSThrowTypeError } from '../error'
-import { HostFunction, JSNewHostFunctionWithProto } from '../function'
+import { HostFunction, JSNewHostConstructor } from '../function'
 import { JSNewObjectFromCtor, JSObjectType, JSNewObject, setObjectData, JSNumberObject, getObjectData } from '../object'
 import {
   JSExpectionValue,
@@ -12,6 +12,7 @@ import {
   isExceptionValue,
   isNumberValue,
   isObjectValue,
+  isUndefinedValue,
 } from '../value'
 import {
   defHostFunction,
@@ -70,8 +71,11 @@ function defProtoFn<T extends keyof Number>(name: T) {
     if (isExceptionValue(numVal)) {
       return numVal
     }
-    const numArgs: number[] = []
+    const numArgs: (number | undefined)[] = []
     for (const arg of args) {
+      if (isUndefinedValue(arg)) {
+        numArgs.push(undefined)
+      }
       const argNum = JSToNumber(ctx, arg)
       if (isExceptionValue(argNum)) {
         return numVal
@@ -85,7 +89,7 @@ function defProtoFn<T extends keyof Number>(name: T) {
       return createNumberValue(ret)
     } catch (e) {
       // TODO: convert host error to vm error
-      return JSThrowTypeError(ctx, 'host run number fn convertion error')
+      return JSThrowTypeError(ctx, `Run number fn "${name}" error: ${(e as any)?.message}`)
     }
   }
 
@@ -116,7 +120,7 @@ const NumberProperties: PropertyDefinitions = [
   defNumberValue('POSITIVE_INFINITY'),
 ]
 
-export function initNumber(ctx: Context) {
+export function JSAddBuiltinNumber(ctx: Context) {
   const proto = (ctx.protos[JSObjectType.Number] = JSNewObject(
     ctx,
     ctx.protos[JSObjectType.Object],
@@ -126,7 +130,7 @@ export function initNumber(ctx: Context) {
 
   JSApplyPropertyDefinitions(ctx, proto, NumberProtoFunctions)
 
-  const ctor = JSNewHostFunctionWithProto(ctx, numberConstructor, 'Number', 1, ctx.protos[JSObjectType.Number])
+  const ctor = JSNewHostConstructor(ctx, numberConstructor, 'Number', 1, ctx.protos[JSObjectType.Number])
 
   JSApplyPropertyDefinitions(ctx, ctor, NumberProperties)
 

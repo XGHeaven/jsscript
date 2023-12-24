@@ -5,6 +5,7 @@ import {
   JSExpectionValue,
   JSNumberValue,
   JSObjectValue,
+  JSStringValue,
   JSValue,
   JSValueType,
   JS_NAN,
@@ -16,7 +17,7 @@ import {
   isUseHostValue,
 } from './value'
 
-export function JSToString(ctx: Context, value: JSValue): JSValue {
+export function JSToString(ctx: Context, value: JSValue): JSStringValue | JSExpectionValue {
   switch (value.type) {
     case JSValueType.Bool:
     case JSValueType.Number:

@@ -1,6 +1,6 @@
 import { JSAtom } from '../atom'
 import { Context } from '../context'
-import { HostFunction, JSNewHostFunction } from '../function'
+import { HostFunction, HostFunctionType, JSNewHostFunction } from '../function'
 import { JSDefinePropertyValue, JS_PROPERTY_C_W, JS_PROPERTY_NONE } from '../object'
 import { JSValue, createHostValue } from '../value'
 
@@ -80,7 +80,7 @@ export function JSApplyPropertyDefinitions(ctx: Context, obj: JSValue, defintion
     let value: JSValue
     switch (def.type) {
       case DefineType.HostFunction: {
-        value = JSNewHostFunction(ctx, def.fn, name as string, def.length)
+        value = JSNewHostFunction(ctx, def.fn, name as string, def.length, HostFunctionType.Function)
         break
       }
       case DefineType.HostValue: {
