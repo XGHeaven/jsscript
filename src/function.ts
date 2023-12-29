@@ -43,6 +43,7 @@ function newHostFunctionBasic(
   const hostFnObj = newObjectInternal(ctx, getProtoObject(ctx, proto), JSObjectType.HostFunction, {
     fn: hostFn,
     rt: ctx.runtime,
+    argc: argLength,
     type,
     isConstructor: type === HostFunctionType.Constructor || type === HostFunctionType.ConstructorOrFunction,
   })

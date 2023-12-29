@@ -1,5 +1,6 @@
 import { Context } from '../context'
-import { JSToString } from '../conversion'
+import { JSToNumberOrInfinity, JSToString } from '../conversion'
+import { JSThrowTypeError } from '../error'
 import { HostFunction, JSNewHostConstructor } from '../function'
 import {
   JSDefinePropertyValue,
@@ -9,7 +10,22 @@ import {
   JS_PROPERTY_NONE,
   setObjectData,
 } from '../object'
-import { JSValue, createNumberValue, createStringValue, isExceptionValue, isUndefinedValue } from '../value'
+import {
+  JSValue,
+  JSValueType,
+  createNumberValue,
+  createStringValue,
+  isExceptionValue,
+  isUndefinedValue,
+} from '../value'
+import { JSApplyPropertyDefinitions, PropertyDefinitions, defHostFunction } from './helper'
+
+function toStringValueWithCheck(ctx: Context, value: JSValue) {
+  if (value.type === JSValueType.Null || value.type === JSValueType.Undefined) {
+    return JSThrowTypeError(ctx, 'null or undefined are forbidden')
+  }
+  return JSToString(ctx, value)
+}
 
 const stringConstructor: HostFunction = (ctx, targetValue, args) => {
   let strVal: JSValue
@@ -37,6 +53,26 @@ const stringConstructor: HostFunction = (ctx, targetValue, args) => {
   return strVal
 }
 
+const stringProtoIndexOf: HostFunction = (ctx, thisVal, args) => {
+  const str = toStringValueWithCheck(ctx, thisVal)
+  if (isExceptionValue(str)) {
+    return str
+  }
+  const searchStr = JSToString(ctx, args[0])
+  if (isExceptionValue(searchStr)) {
+    return searchStr
+  }
+
+  const pos = args[1] ? JSToNumberOrInfinity(ctx, args[1]) : createNumberValue(0)
+  if (isExceptionValue(pos)) {
+    return pos
+  }
+
+  return createNumberValue(str.value.indexOf(searchStr.value, pos.value))
+}
+
+const stringProtoPropertyDefs: PropertyDefinitions = [defHostFunction('indexOf', stringProtoIndexOf, 1)]
+
 export function JSAddBuiltinString(ctx: Context) {
   const stringProto = (ctx.protos[JSObjectType.String] = JSNewObjectProtoClass(
     ctx,
@@ -44,6 +80,7 @@ export function JSAddBuiltinString(ctx: Context) {
     JSObjectType.String
   ))
   setObjectData(stringProto.value, createStringValue(''))
+  JSApplyPropertyDefinitions(ctx, stringProto, stringProtoPropertyDefs)
 
   const ctor = JSNewHostConstructor(ctx, stringConstructor, 'String', 1, stringProto)
 

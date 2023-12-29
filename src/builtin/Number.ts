@@ -8,6 +8,7 @@ import {
   JSNumberValue,
   JSValue,
   JS_UNDEFINED,
+  createHostValue,
   createNumberValue,
   isExceptionValue,
   isNumberValue,
@@ -43,7 +44,7 @@ const numberProtoValueOf: HostFunction = (ctx, thisObj, args) => {
 
 const numberConstructor: HostFunction = (ctx, targetObj, args) => {
   let value: JSValue
-  if (!args.length) {
+  if (!args.length || isUndefinedValue(args[0])) {
     value = createNumberValue(0)
   } else {
     value = JSToNumber(ctx, args[0])
@@ -75,6 +76,7 @@ function defProtoFn<T extends keyof Number>(name: T) {
     for (const arg of args) {
       if (isUndefinedValue(arg)) {
         numArgs.push(undefined)
+        continue
       }
       const argNum = JSToNumber(ctx, arg)
       if (isExceptionValue(argNum)) {
@@ -86,7 +88,7 @@ function defProtoFn<T extends keyof Number>(name: T) {
     let ret: number
     try {
       ret = protoFn.apply(numVal.value, numArgs)
-      return createNumberValue(ret)
+      return createHostValue(ret)
     } catch (e) {
       // TODO: convert host error to vm error
       return JSThrowTypeError(ctx, `Run number fn "${name}" error: ${(e as any)?.message}`)

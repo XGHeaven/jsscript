@@ -1,7 +1,10 @@
-import { JSAtom } from './atom'
+import { JSAtom, JSHostValueToAtom } from './atom'
 import { Context } from './context'
+import { JSToBoolean, JSToObject } from './conversion'
 import { JSThrowReferenceErrorNotDefine, JSThrowTypeError, JSInitErrorProto } from './error'
+import { callInternal } from './executor'
 import { HostFunction, HostFunctionType, JSNewHostFunctionWithProto } from './function'
+import { debug } from './log'
 import { Runtime } from './runtime'
 import { Scope } from './scope'
 import {
@@ -13,6 +16,8 @@ import {
   JSValueType,
   JS_NULL,
   JS_UNDEFINED,
+  createBoolValue,
+  createNumberValue,
   createStringValue,
   isExceptionValue,
   isNullValue,
@@ -32,6 +37,8 @@ export const enum JSObjectType {
   Number,
   String,
 
+  Arguments,
+
   LastMark,
 }
 
@@ -47,15 +54,17 @@ type JSObjectDataMap = {
   }
   [JSObjectType.HostFunction]: {
     fn: HostFunction
+    argc: number
     rt: Runtime
     type: HostFunctionType
     isConstructor: boolean
   }
-  [JSObjectType.Array]: unknown[]
+  // use a better type
+  [JSObjectType.Array]: unknown[] & Record<JSAtom, unknown>
   [JSObjectType.Number]: JSNumberValue
   [JSObjectType.String]: JSStringValue
   [JSObjectType.ForInIterator]: {
-    keys: string[]
+    keys: JSAtom[]
     pos: number
   }
   [JSObjectType.ForOfIterator]: {
@@ -133,6 +142,87 @@ export interface Property {
   getset: boolean
 }
 
+interface PropertyDesc {
+  flags: number
+  value: JSValue
+  get: JSValue
+  set: JSValue
+}
+
+export function jsValueToPropertyDesc(ctx: Context, value: JSValue): PropertyDesc | null {
+  if (!isObjectValue(value)) {
+    JSThrowTypeError(ctx, 'descriptor is not a object')
+    return null
+  }
+
+  const desc: PropertyDesc = {
+    flags: JS_PROPERTY_NONE,
+    value: JS_UNDEFINED,
+    get: JS_UNDEFINED,
+    set: JS_UNDEFINED,
+  }
+
+  if (JSHasProperty(ctx, value, 'enumerable')) {
+    const propValue = JSGetProperty(ctx, value, 'enumerable')
+    if (isExceptionValue(propValue)) {
+      return null
+    }
+    const ret = JSToBoolean(ctx, propValue)
+
+    desc.flags |= ret.value ? JS_PROPERTY_ENUMERABLE : JS_PROPERTY_NONE
+  }
+
+  if (JSHasProperty(ctx, value, 'configurable')) {
+    const propValue = JSGetProperty(ctx, value, 'configurable')
+    if (isExceptionValue(propValue)) {
+      return null
+    }
+    const ret = JSToBoolean(ctx, propValue)
+    desc.flags |= ret.value ? JS_PROPERTY_CONFIGURE : JS_PROPERTY_NONE
+  }
+
+  if (JSHasProperty(ctx, value, 'value')) {
+    const propValue = JSGetProperty(ctx, value, 'value')
+    if (isExceptionValue(propValue)) {
+      return null
+    }
+    desc.value = propValue
+  }
+
+  if (JSHasProperty(ctx, value, 'writable')) {
+    const propValue = JSGetProperty(ctx, value, 'writable')
+    if (isExceptionValue(propValue)) {
+      return null
+    }
+    const ret = JSToBoolean(ctx, propValue)
+    desc.flags |= ret.value ? JS_PROPERTY_WRITABLE : JS_PROPERTY_NONE
+  }
+
+  if (JSHasProperty(ctx, value, 'get')) {
+    const propValue = JSGetProperty(ctx, value, 'get')
+    if (isExceptionValue(propValue)) {
+      return null
+    }
+    // TODO: check function
+    desc.get = propValue
+    desc.flags |= JS_PROPERTY_GETSET
+  }
+
+  if (JSHasProperty(ctx, value, 'set')) {
+    const propValue = JSGetProperty(ctx, value, 'set')
+    if (isExceptionValue(propValue)) {
+      return null
+    }
+    // TODO: check function
+    desc.set = propValue
+    desc.flags |= JS_PROPERTY_GETSET
+  }
+
+  // TODO: check get/set and value cannot using together
+
+  return desc
+}
+
 export function getProtoObject(ctx: Context, proto: JSValue | null): JSObject | null {
   return proto && isObjectValue(proto) ? proto.value : null
 }
@@ -167,13 +257,13 @@ export function JSNewPlainObjectProto(ctx: Context, proto: JSValue) {
 }
 
 export function JSNewForInIteratorObject(ctx: Context, value: JSValue): JSValue {
-  const keys: string[] = []
+  const keys: JSAtom[] = []
   if (!isObjectValue(value)) {
     return JSThrowTypeError(ctx, `value is not a object`)
   }
   let obj: JSObject | null = value.value
   while (obj) {
-    keys.push(...Object.keys(obj.props))
+    keys.push(...Array.from(obj.props.keys()))
     obj = obj.proto
   }
   return makeObject(
@@ -196,7 +286,8 @@ export function JSIteratorObjectNext(ctx: Context, value: JSValue): JSValue | nu
       if (data.pos >= data.keys.length) {
         return null
       }
-      return createStringValue(data.keys[data.pos])
+      // TODO: symbol
+      return createStringValue(data.keys[data.pos] as string)
     }
   }
 
@@ -219,6 +310,21 @@ export function propertyFlagsFromDescriptor(desc: PropertyDescriptor) {
   if (desc.writable) flags ||= JS_PROPERTY_WRITABLE
   if (desc.get || desc.set) flags ||= JS_PROPERTY_GETSET
   return flags
+}
+
+export function jsPropertyToDescValue(ctx: Context, pr: Property): JSValue {
+  const desc = JSNewPlainObject(ctx)
+  JSDefinePropertyValue(ctx, desc, 'configurable', createBoolValue(pr.configure), JS_PROPERTY_C_W_E)
+  JSDefinePropertyValue(ctx, desc, 'enumerable', createBoolValue(pr.enumerable), JS_PROPERTY_C_W_E)
+  if (pr.getset) {
+    JSDefinePropertyValue(ctx, desc, 'get', pr.getter, JS_PROPERTY_C_W_E)
+    JSDefinePropertyValue(ctx, desc, 'set', pr.setter, JS_PROPERTY_C_W_E)
+  } else {
+    JSDefinePropertyValue(ctx, desc, 'writable', createBoolValue(pr.writable), JS_PROPERTY_C_W_E)
+    JSDefinePropertyValue(ctx, desc, 'value', pr.value, JS_PROPERTY_C_W_E)
+  }
+
+  return desc
 }
 
 export function JSSetPropertyValue(ctx: Context, objValue: JSValue, prop: JSAtom, value: JSValue): number {
@@ -270,6 +376,20 @@ export function JSDefinePropertyValue(
   flags: number
 ): number {
   return JSDefineProperty(ctx, objValue, prop, value, JS_UNDEFINED, JS_UNDEFINED, flags)
+}
+
+export function JSDefinePropertyDesc(
+  ctx: Context,
+  objValue: JSValue,
+  prop: JSAtom,
+  descVal: JSValue,
+  extraFlags: number = 0
+): number {
+  const desc = jsValueToPropertyDesc(ctx, descVal)
+  if (!desc) {
+    return -1
+  }
+  return JSDefineProperty(ctx, objValue, prop, desc.value, desc.get, desc.set, desc.flags | extraFlags)
 }
 
 export function JSDefineProperty(
@@ -331,7 +451,12 @@ export function JSCreateProperty(
   obj.props.set(prop, p)
 
   if (obj.type === JSObjectType.Array) {
-    // ((obj as JSArrayObject).data as any)[prop] = true
+    const data = (obj as JSArrayObject).data
+    const originalValue = data[prop]
+    if (originalValue === undefined) {
+      // markit as used
+      data[prop] = true
+    }
   }
 
   return 0
@@ -339,6 +464,18 @@ export function JSCreateProperty(
 
 export function JSGetProperty(ctx: Context, obj: JSValue, prop: JSAtom) {
   return getPropertyLikeJS(ctx, obj, prop, obj, false)
+}
+
+export function JSGetOwnPropertyDescValue(ctx: Context, objValue: JSValue, prop: JSAtom) {
+  if (!isObjectValue(objValue)) {
+    return JS_UNDEFINED
+  }
+  const obj = objValue.value
+  const pr = findOwnProperty(ctx, obj, prop)
+  if (!pr) {
+    return JS_UNDEFINED
+  }
+  return jsPropertyToDescValue(ctx, pr)
 }
 
 export function getPropertyLikeJS(
@@ -368,10 +505,19 @@ export function getPropertyLikeJS(
     o = objValue.value
   }
 
-  if (o.type === JSObjectType.Array && typeof prop === 'number') {
-    // TODO: remove error
-    // @ts-expect-error
-    return (o as JSArrayObject).props[prop]
+  if (o.type === JSObjectType.Array) {
+    const data = (o as JSArrayObject).data
+    if (prop === 'length') {
+      return createNumberValue(data.length)
+    }
+    // TODO: remove any
+    if ((data as any)[prop] === true) {
+      // TODO: remove error
+      // @ts-expect-error
+      return o.props.get(prop).value
+    }
+
+    // fallback to normal object
   }
 
   const p = findProperty(ctx, o, prop)
@@ -383,11 +529,32 @@ export function getPropertyLikeJS(
   }
 
   if (p.getset) {
-    // TODO
-    return JS_NULL
+    debug('- call getset')
+    return callInternal(ctx, p.getter, objValue, JS_UNDEFINED, [])
   } else {
     return p.value
   }
+}
+
+export function JSHasProperty(ctx: Context, value: JSValue, prop: JSAtom): boolean {
+  if (!isObjectValue(value)) {
+    return false
+  }
+  return !!findProperty(ctx, value.value, prop)
+}
+
+export function JSHasOwnProperty(ctx: Context, value: JSValue, prop: JSAtom): boolean {
+  if (!isObjectValue(value)) {
+    return false
+  }
+  return !!findOwnProperty(ctx, value.value, prop)
+}
+
+export function jsFindOwnProperty(ctx: Context, value: JSValue, prop: JSAtom): Property | null {
+  if (!isObjectValue(value)) {
+    return null
+  }
+  return findOwnProperty(ctx, value.value, prop)
 }
 
 function findOwnProperty(ctx: Context, obj: JSObject, prop: JSAtom): Property | null {
@@ -453,7 +620,16 @@ export function JSInitBasicPrototype(ctx: Context) {
 
   JSInitErrorProto(ctx)
 
-  ctx.protos[JSObjectType.Array] = JSNewObject(ctx, objProto, JSObjectType.Array)
+  const arrayProto = (ctx.protos[JSObjectType.Array] = JSNewObject(ctx, objProto, JSObjectType.Array))
+  setObjectData(arrayProto.value as JSArrayObject, [] as unknown[] as unknown[] & Record<JSAtom, unknown>)
+}
+
+function convertPropsToObject(props: Map<JSAtom, Property>, transferedSets: WeakSet<object>) {
+  return Object.fromEntries(
+    Array.from(props.entries())
+      .filter(([_, desc]) => desc.enumerable)
+      .map(([prop, desc]) => [prop, toHostValue(desc.value, transferedSets)])
+  )
 }
 
 export function toHostObject(obj: JSObject, transferedSets: WeakSet<object>) {
@@ -463,19 +639,71 @@ export function toHostObject(obj: JSObject, transferedSets: WeakSet<object>) {
   transferedSets.add(obj)
   switch (obj.type) {
     case JSObjectType.Object:
-      return Object.fromEntries(
-        Object.entries(obj.props)
-          .filter(([_, desc]) => desc.enumerable && desc.configure)
-          .map(([prop, desc]) => [prop, toHostValue(desc.value, transferedSets)])
-      )
+      return convertPropsToObject(obj.props, transferedSets)
     case JSObjectType.Error:
       return new Error(`${toHostValue(obj.props.get('message')!.value, transferedSets) as string}`)
     case JSObjectType.Array:
       return (obj.props as unknown as any[]).map((v) => (v ? toHostValue(v.value, transferedSets) : v))
     case JSObjectType.Function:
       return `[object Function]`
+    case JSObjectType.Arguments: {
+      const o = convertPropsToObject(obj.props, transferedSets)
+      o.__TYPE__ = 'arguments'
+      return o
+    }
     default: {
       return { __INTERNAL__: `Unknown object type ${obj.type}` }
     }
   }
+}
+
+export function JSNewArgumentsObjectWithArgs(ctx: Context, args: JSValue[]) {
+  const obj = JSNewObject(ctx, ctx.objProto, JSObjectType.Arguments)
+  JSDefinePropertyValue(ctx, obj, 'length', createNumberValue(args.length), JS_PROPERTY_C_W)
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i]
+    // TODO: handle error?
+    JSDefinePropertyValue(ctx, obj, JSHostValueToAtom(ctx, i), arg, JS_PROPERTY_C_W_E)
+  }
+
+  return obj
+}
+
+export function JSValueIsArrayObject(ctx: Context, value: JSValue): boolean {
+  // TODO: handle proxy
+  return isObjectValue(value) && value.value.type === JSObjectType.Array
+}
+
+export function JSDeleteProp(ctx: Context, objValue: JSValue, prop: JSAtom): boolean {
+  const obj = JSToObject(ctx, objValue)
+  if (isExceptionValue(obj)) {
+    return false
+  }
+  const ret = deleteProperty(ctx, obj.value, prop)
+  if (ret) {
+    return true
+  }
+  JSThrowTypeError(ctx, `could not delete "${String(prop)}" property`)
+  return false
+}
+
+function deleteProperty(ctx: Context, obj: JSObject, prop: JSAtom): boolean {
+  const pr = findOwnProperty(ctx, obj, prop)
+  if (pr) {
+    if (!pr.configure) {
+      return false
+    }
+    obj.props.delete(prop)
+
+    if (obj.type === JSObjectType.Array) {
+      const data = (obj as JSArrayObject).data
+      if (data[prop] === true) {
+        delete data[prop]
+      }
+    }
+
+    return true
+  }
+
+  return true
 }

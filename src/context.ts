@@ -9,6 +9,7 @@ import {
   JS_PROPERTY_CONFIGURE,
   JS_PROPERTY_C_W_E,
   JSInitBasicPrototype,
+  makeObject,
 } from './object'
 import { JSAtom } from './atom'
 import { JSAddBuiltinMath } from './builtin/Math'
@@ -16,6 +17,8 @@ import { JSAddBuiltinNumber } from './builtin/Number'
 import { JSAddBuiltinError } from './error'
 import { JSAddBuiltinString } from './builtin/String'
 import { JSAddBuiltinArray } from './builtin/Array'
+import { JSAddBuiltinObject } from './builtin/Object'
+import { JSAddBuiltinFunction } from './builtin/Function'
 
 export class Context {
   globalValue: JSValue
@@ -41,6 +44,8 @@ export class Context {
     JSDefinePropertyValue(this, this.globalValue, 'NaN', JS_NAN, JS_PROPERTY_CONFIGURE)
     JSDefinePropertyValue(this, this.globalValue, 'Infinity', JS_INFINITY, JS_PROPERTY_CONFIGURE)
 
+    JSAddBuiltinObject(this)
+    JSAddBuiltinFunction(this)
     JSAddBuiltinArray(this)
     JSAddBuiltinError(this)
     JSAddBuiltinMath(this)
@@ -54,5 +59,9 @@ export class Context {
 
   defineGlobalValue(name: JSAtom, value: JSValue) {
     JSDefinePropertyValue(this, this.globalValue, name, value, JS_PROPERTY_C_W_E)
+  }
+
+  getActiveFunction(): JSValue {
+    return this.currentStackFrame?.fn ? makeObject(this.currentStackFrame.fn) : JS_UNDEFINED
   }
 }

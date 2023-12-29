@@ -26,6 +26,7 @@ if (file) {
   const fn = parseScript(context, script)
   const ret = context.run(fn)
   if (isExceptionValue(ret)) {
-    throw toHostValue(isolute.currentException!)
+    console.log(toHostValue(isolute.currentException!))
+    process.exit(1)
   }
 }

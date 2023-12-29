@@ -1,5 +1,6 @@
 import { Context } from './context'
 import { JSThrowTypeError } from './error'
+import { JSNewPlainObject, JSObject, JSObjectType, getObjectData } from './object'
 import {
   JSBoolValue,
   JSExpectionValue,
@@ -13,6 +14,7 @@ import {
   createBoolValue,
   createNumberValue,
   createStringValue,
+  isExceptionValue,
   isObjectValue,
   isUseHostValue,
 } from './value'
@@ -59,15 +61,10 @@ export function JSOridinaryToPrimitive(
   value: JSObjectValue,
   preferredType: ToPrimitivePreferredType
 ): JSValue {
-  // switch(value.type) {
-  //   case JSValueType.Bool:
-  //   case JSValueType.Undefined:
-  //   case JSValueType.Symbol:
-  //   case JSValueType.String:
-  //   case JSValueType.Number:
-  //     return value.value
-  //   case JSValueType.Object
-  // }
+  switch (value.value.type) {
+    case JSObjectType.String:
+      return getObjectData(value.value as JSObject<JSObjectType.String>)
+  }
 
   // TODO
   return JS_UNDEFINED
@@ -96,6 +93,19 @@ export function JSToNumber(ctx: Context, value: JSValue): JSNumberValue | JSExpe
   return JSToNumber(ctx, pri)
 }
 
+export function JSToNumberOrInfinity(ctx: Context, value: JSValue): JSNumberValue | JSExpectionValue {
+  const numVal = JSToNumber(ctx, value)
+  if (isExceptionValue(numVal)) {
+    return numVal
+  }
+  const num = numVal.value
+  // change NaN +0 -0 0 to 0
+  if (isNaN(num) || num === -0) {
+    return createNumberValue(0)
+  }
+  return numVal
+}
+
 export function JSToBoolean(ctx: Context, value: JSValue): JSBoolValue {
   if (isUseHostValue(value)) {
     return createBoolValue(value.value ? true : false)
@@ -108,4 +118,15 @@ export function JSToNotBoolean(ctx: Context, value: JSValue): JSBoolValue {
     return createBoolValue(value.value ? false : true)
   }
   return createBoolValue(false)
+}
+
+export function JSToObject(ctx: Context, value: JSValue): JSObjectValue | JSExpectionValue {
+  switch (value.type) {
+    case JSValueType.Null:
+    case JSValueType.Undefined:
+      return JSThrowTypeError(ctx, 'Cannot convert undefined or null to object')
+    case JSValueType.Object:
+      return value
+  }
+  return JSNewPlainObject(ctx)
 }
