@@ -159,14 +159,13 @@ export function isPrimitiveValue(
   )
 }
 
-export function isUseHostValue(
-  value: JSValue
-): value is JSBoolValue | JSNumberValue | JSStringValue | JSUndefinedValue {
+export function isUseHostValue(value: JSValue): value is JSHostValue {
   return (
     value.type === JSValueType.Bool ||
     value.type === JSValueType.Number ||
     value.type === JSValueType.String ||
-    value.type === JSValueType.Undefined
+    value.type === JSValueType.Undefined ||
+    value.type === JSValueType.Null
   )
 }
 

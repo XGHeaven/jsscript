@@ -3,6 +3,7 @@ export enum Bytecode {
   Stop,
 
   // Binary
+  // () [a b] => [c]
   Plus,
   // () [a b] => [c]
   Sub,
@@ -25,12 +26,6 @@ export enum Bytecode {
   // () [v] => [string]
   TypeOf,
 
-  // Logical
-  // () [a b] => [v]
-  AndAnd,
-  // () [a b] => [v]
-  OrOr,
-
   PlusConst,
   // (constId: number)
   PlusConstId,
@@ -44,6 +39,8 @@ export enum Bytecode {
   PushThis,
   // (pc: number)
   Goto,
+  // () [] => []
+  Hoisted,
   // (pc: number) (v) => ()
   IfTrue,
   // (pc: numebr) (v) => ()
@@ -83,6 +80,8 @@ export enum Bytecode {
   GetFieldReplace,
   // (fieldName: string) (v obj) => (v)
   SetField,
+  // () [value obj name] => [value]
+  SetArrayElement,
   // () (obj name) => (obj value)
   GetAarryElement,
   // () (obj name) => (value)
@@ -91,10 +90,16 @@ export enum Bytecode {
   // () [obj name] => [bool]
   Delete,
 
+  // () [obj inst] => [bool]
+  InstanceOf,
+
   PushScope, // [scopeId: number]
   PopScope, // []
 
+  // () [] => [o]
   Object, // create empty object
+  // () [] => [args]
+  Arguments, // create arguments object
 
   // (argc: number) (...args) => (array)
   ArrayFrom, // create empty array

@@ -41,6 +41,12 @@ const hostFunctionCallHandler: JSClassCall = (ctx, fnObj, thisObj, args, isNew) 
       break
   }
 
+  if (args.length < data.argc) {
+    for (let i = args.length; i < data.argc; i++) {
+      args.push(JS_UNDEFINED)
+    }
+  }
+
   const returnValue = hostFn(ctx, thisOrTarget, args)
   return returnValue
 }

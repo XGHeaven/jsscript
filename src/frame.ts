@@ -8,6 +8,7 @@ export interface StackFrame {
   values: JSValue[]
   parentFrame: StackFrame | null
   scope: Scope
+  fn: JSFunctionObject
 }
 
 export function createStackFrame(context: Context, fn: JSFunctionObject): StackFrame {
@@ -22,5 +23,6 @@ export function createStackFrame(context: Context, fn: JSFunctionObject): StackF
     values: new Array(body.maxValueStackSize + 1).fill(JS_UNDEFINED),
     parentFrame: null,
     scope,
+    fn,
   }
 }

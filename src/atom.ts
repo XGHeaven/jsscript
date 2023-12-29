@@ -1,11 +1,9 @@
 import { Context } from './context'
 import { JSValue, JSValueType } from './value'
 
-export type JSAtom = string | number | symbol
+export type JSAtom = string | symbol
 
-export type JSAtomProperty = string | symbol
-
-export function JSToPropertyKey(ctx: Context, value: JSValue): JSAtomProperty {
+export function JSToPropertyKey(ctx: Context, value: JSValue): JSAtom {
   switch (value.type) {
     case JSValueType.Bool:
     case JSValueType.Undefined:
@@ -30,4 +28,14 @@ export function JSAtomToString(ctx: Context, value: JSAtom): string {
     return `Symbol(${value.description})`
   }
   return `${value}`
+}
+
+export function JSHostValueToAtom(ctx: Context, hostValue: string | number | symbol): JSAtom {
+  if (typeof hostValue === 'number') {
+    return `${hostValue}`
+  }
+  if (typeof hostValue !== 'symbol' && typeof hostValue !== 'string') {
+    throw new Error(`JSHostValueToAtom error: found ${typeof hostValue}`)
+  }
+  return hostValue
 }

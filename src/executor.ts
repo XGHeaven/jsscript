@@ -30,14 +30,18 @@ import {
   JSSetPropertyValue,
   JS_PROPERTY_C_W_E,
   getObjectData,
+  JSNewArgumentsObjectWithArgs,
+  JSDeleteProp as JSDeleteProperty,
 } from './object'
 import { JSNewArray } from './array'
 import { Scope } from './scope'
 import { JSThrow, JSThrowTypeError } from './error'
-import { JSAtom } from './atom'
+import { JSAtom, JSHostValueToAtom, JSToPropertyKey } from './atom'
 import { JSNewFunctionObject, callConstructor } from './function'
 import { debug } from './log'
 import { JSToNotBoolean, JSToNumber } from './conversion'
+import { JSInstanceOf, isStrictEqual } from './comparison'
+import { JSAddOperator } from './operator'
 
 export function callInternal(
   ctx: Context,
@@ -93,19 +97,17 @@ export function callInternal(
         break
       }
       case Bytecode.Plus: {
-        const l = v[sp--]
-        const r = v[sp]
-        if (isUseHostValue(l) && isUseHostValue(r)) {
-          v[sp] = createHostValue((l.value as any) + (r.value as any))
-        } else {
-          // TODO: slow add
-          v[sp] = createHostValue(-1)
+        const r = v[sp--]
+        const l = v[sp]
+        const ret = JSAddOperator(ctx, l, r)
+        if (!isExceptionValue(ret)) {
+          v[sp] = ret
         }
         break
       }
       case Bytecode.Sub: {
-        const a = v[sp--]
-        const b = v[sp]
+        const b = v[sp--]
+        const a = v[sp]
         if (isUseHostValue(a) && isUseHostValue(b)) {
           v[sp] = createHostValue((a.value as number) - (b.value as number))
         } else {
@@ -208,10 +210,10 @@ export function callInternal(
         break
       }
       case Bytecode.SetField: {
-        const name = ops[pc++] as string
-        // @ts-expect-error
-        const ret = JSSetPropertyValue(ctx, v[sp--], name, v[sp])
-        // TODO
+        // TODO: as
+        const name = JSHostValueToAtom(ctx, ops[pc++] as string)
+        debug(`\t${String(name)}=...`)
+        JSSetPropertyValue(ctx, v[sp--], name, v[sp])
         break
       }
       case Bytecode.DefineArrayElement: {
@@ -223,7 +225,7 @@ export function callInternal(
         break
       }
       case Bytecode.GetAarryElement: {
-        const prop = valueToString(v[sp--])
+        const prop = JSToPropertyKey(ctx, v[sp--])
         const obj = v[sp]
         const val = JSGetProperty(ctx, obj, prop)
         if (!isExceptionValue(val)) {
@@ -232,12 +234,18 @@ export function callInternal(
         break
       }
       case Bytecode.GetArrayElementReplace: {
-        const prop = valueToString(v[sp--])
+        const prop = JSToPropertyKey(ctx, v[sp--])
         const obj = v[sp]
         const val = JSGetProperty(ctx, obj, prop)
         if (!isExceptionValue(val)) {
-          v[++sp] = val
+          v[sp] = val
         }
+        break
+      }
+      case Bytecode.SetArrayElement: {
+        const name = v[sp--]
+        const obj = v[sp--]
+        JSSetPropertyValue(ctx, obj, JSToPropertyKey(ctx, name), v[sp])
         break
       }
       case Bytecode.GetField: {
@@ -267,9 +275,9 @@ export function callInternal(
         const argc = ops[pc++] as number
         const array = JSNewArray(ctx)
         for (let i = argc - 1; i >= 0; i--) {
-          JSDefinePropertyValue(ctx, array, argc - 1 - i, v[sp - i], JS_PROPERTY_C_W_E)
+          JSDefinePropertyValue(ctx, array, `${argc - 1 - i}`, v[sp - i], JS_PROPERTY_C_W_E)
         }
-        sp -= argc
+        sp -= argc - 1
         v[sp] = array
         break
       }
@@ -326,15 +334,10 @@ export function callInternal(
         break
       }
       case Bytecode.EqEqEq: {
-        const a = v[sp--]
-        const b = v[sp]
-        if (isUseHostValue(a) && isUseHostValue(b)) {
-          v[sp] = createBoolValue(a.value === b.value)
-        } else {
-          // TODO: slow compare
-          v[sp] = createBoolValue(false)
-        }
-        debug(`\t${formatValue(a)} "===" ${formatValue(b)} = ${formatValue(v[sp])}`)
+        const r = v[sp--]
+        const l = v[sp]
+        v[sp] = createBoolValue(isStrictEqual(l, r))
+        debug(`\t${formatValue(l)} "===" ${formatValue(r)} = ${formatValue(v[sp])}`)
         break
       }
       case Bytecode.EqEq: {
@@ -437,32 +440,6 @@ export function callInternal(
         v[sp] = createHostValue(ret)
         break
       }
-      case Bytecode.AndAnd: {
-        const b = v[sp--]
-        const a = v[sp]
-        let ret: any
-        if (isUseHostValue(a) && isUseHostValue(b)) {
-          ret = a.value && b.value
-        } else {
-          // TODO
-          ret = false
-        }
-        v[sp] = createHostValue(ret)
-        break
-      }
-      case Bytecode.OrOr: {
-        const b = v[sp--]
-        const a = v[sp]
-        let ret: any
-        if (isUseHostValue(a) && isUseHostValue(b)) {
-          ret = a.value || b.value
-        } else {
-          // TODO
-          ret = false
-        }
-        v[sp] = createHostValue(ret)
-        break
-      }
       case Bytecode.TypeOf: {
         v[sp] = JSTypeOf(ctx, v[sp])
         break
@@ -471,8 +448,31 @@ export function callInternal(
         v[++sp] = thisValue
         break
       }
+      case Bytecode.Arguments: {
+        v[++sp] = JSNewArgumentsObjectWithArgs(ctx, args)
+        break
+      }
+      case Bytecode.Delete: {
+        const name = v[sp--]
+        const obj = v[sp]
+        const prop = JSToPropertyKey(ctx, name)
+        const ret = JSDeleteProperty(ctx, obj, prop)
+
+        // TODO: handle error
+        v[sp] = createBoolValue(ret)
+        break
+      }
+      case Bytecode.InstanceOf: {
+        const target = v[sp--]
+        const obj = v[sp]
+        const ret = JSInstanceOf(ctx, obj, target)
+        if (ret >= 0) {
+          v[sp] = createBoolValue(!!ret)
+        }
+        break
+      }
       case Bytecode.Warning: {
-        console.warn(`Warning: ${ops[pc++]}`)
+        console.warn(`==== Warning: ${ops[pc++]} ====`)
         break
       }
       default: {
