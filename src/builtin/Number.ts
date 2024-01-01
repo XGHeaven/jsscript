@@ -7,7 +7,8 @@ import {
   JSExpectionValue,
   JSNumberValue,
   JSValue,
-  JS_UNDEFINED,
+  JS_FALSE,
+  createBoolValue,
   createHostValue,
   createNumberValue,
   isExceptionValue,
@@ -53,7 +54,7 @@ const numberConstructor: HostFunction = (ctx, targetObj, args) => {
     }
   }
 
-  if (targetObj !== JS_UNDEFINED) {
+  if (!isUndefinedValue(targetObj)) {
     const obj = JSNewObjectFromCtor(ctx, targetObj, JSObjectType.Number)
     if (!isExceptionValue(obj)) {
       setObjectData(obj.value as JSNumberObject, value)
@@ -102,6 +103,18 @@ function defNumberValue<T extends FilterTypeKeys<NumberConstructor, number>>(nam
   return defHostValueImmutable(name, Number[name])
 }
 
+function defNumberCheckFn<T extends FilterTypeKeys<NumberConstructor, (a1: number) => boolean>>(name: T) {
+  const length = 1
+  const hostFn: HostFunction = (ctx, _, [numVal]) => {
+    if (!isNumberValue(numVal)) {
+      return JS_FALSE
+    }
+
+    return createBoolValue(Number[name](numVal.value))
+  }
+  return defHostFunction(name, hostFn, length)
+}
+
 const NumberProtoFunctions: PropertyDefinitions = [
   defHostFunction('valueOf', numberProtoValueOf, 0),
   defProtoFn('toString'),
@@ -120,6 +133,11 @@ const NumberProperties: PropertyDefinitions = [
   defNumberValue('NEGATIVE_INFINITY'),
   defNumberValue('NaN'),
   defNumberValue('POSITIVE_INFINITY'),
+
+  defNumberCheckFn('isNaN'),
+  defNumberCheckFn('isFinite'),
+  defNumberCheckFn('isInteger'),
+  defNumberCheckFn('isSafeInteger'),
 ]
 
 export function JSAddBuiltinNumber(ctx: Context) {
