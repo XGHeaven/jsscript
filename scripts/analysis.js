@@ -30,7 +30,7 @@ function makeBadge(type, all, success) {
   return {
       'schemaVersion': 1,
       'label': `Test262(${type})`,
-      'message': `${(success/all).toFixed(2)}% ${success}/${all}`,
+      'message': `${(success/all*100).toFixed(2)}% ${success}/${all}`,
       'color': 'green'
   }
 }

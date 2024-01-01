@@ -9,6 +9,7 @@ import { Runtime } from './runtime'
 import { Scope } from './scope'
 import {
   FunctionBytecode,
+  JSBoolValue,
   JSNumberValue,
   JSObjectValue,
   JSStringValue,
@@ -35,6 +36,7 @@ export const enum JSObjectType {
   ForInIterator,
   ForOfIterator,
   Number,
+  Boolean,
   String,
 
   Arguments,
@@ -62,6 +64,7 @@ type JSObjectDataMap = {
   // use a better type
   [JSObjectType.Array]: unknown[] & Record<JSAtom, unknown>
   [JSObjectType.Number]: JSNumberValue
+  [JSObjectType.Boolean]: JSBoolValue
   [JSObjectType.String]: JSStringValue
   [JSObjectType.ForInIterator]: {
     keys: JSAtom[]
@@ -129,6 +132,7 @@ export type JSPlainObject = JSObject<JSObjectType.Object | JSObjectType.String |
 export type JSForInIteratorObject = JSObject<JSObjectType.ForInIterator>
 export type JSForOfIteratorObject = JSObject<JSObjectType.ForOfIterator>
 export type JSNumberObject = JSObject<JSObjectType.Number>
+export type JSBooleanObject = JSObject<JSObjectType.Boolean>
 
 export interface Property {
   configure: boolean
@@ -572,7 +576,7 @@ function findProperty(ctx: Context, obj: JSObject, prop: JSAtom): Property | nul
   }
   const { proto } = obj
   if (proto) {
-    return findOwnProperty(ctx, proto, prop)
+    return findProperty(ctx, proto, prop)
   }
 
   return null
@@ -706,4 +710,12 @@ function deleteProperty(ctx: Context, obj: JSObject, prop: JSAtom): boolean {
   }
 
   return true
+}
+
+// check a is prototype of b
+export function isPrototypeOf(a: JSObject, b: JSObject) {
+  while (a.proto !== b && a.proto) {
+    a = a.proto
+  }
+  return a.proto === b
 }

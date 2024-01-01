@@ -13,6 +13,7 @@ import {
   JSNewFunction,
   newObjectInternal,
   JSNewObjectFromCtor,
+  JS_PROPERTY_NONE,
 } from './object'
 import { Scope } from './scope'
 import {
@@ -111,7 +112,7 @@ function initFunctionObject(ctx: Context, fnValue: JSValue) {
 }
 
 function initConstructorObject(ctx: Context, ctor: JSValue, prototype: JSValue) {
-  JSInitConstructorFlags(ctx, ctor, prototype, JS_PROPERTY_C_W)
+  JSInitConstructorFlags(ctx, ctor, prototype, JS_PROPERTY_NONE)
 }
 
 export function JSInitConstructorFlags(ctx: Context, ctor: JSValue, prototype: JSValue, flags: number) {

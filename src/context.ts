@@ -19,6 +19,7 @@ import { JSAddBuiltinString } from './builtin/String'
 import { JSAddBuiltinArray } from './builtin/Array'
 import { JSAddBuiltinObject } from './builtin/Object'
 import { JSAddBuiltinFunction } from './builtin/Function'
+import { JSAddBuiltinBoolean } from './builtin/Boolean'
 
 export class Context {
   globalValue: JSValue
@@ -50,6 +51,7 @@ export class Context {
     JSAddBuiltinError(this)
     JSAddBuiltinMath(this)
     JSAddBuiltinNumber(this)
+    JSAddBuiltinBoolean(this)
     JSAddBuiltinString(this)
   }
 
